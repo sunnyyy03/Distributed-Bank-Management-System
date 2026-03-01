@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  hq-server:
+    build: ./hq_server
+    container_name: hq-central-server
+    ports:
+      - "8000:8000"
+    networks:
+      - bank-network
+
+  branch-101:
+    build: ./branch_node
+    container_name: branch-node-101
+    depends_on:
+      - hq-server
+    environment:
+      - HQ_URL=http://hq-server:8000
+      - BRANCH_ID=101
+    networks:
+      - bank-network
+
+networks:
+  bank-network:
+    driver: bridge
