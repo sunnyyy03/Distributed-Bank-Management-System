@@ -11,7 +11,8 @@ To run this project, you will need the following installed on your machine:
 ```text
 bank_management_system/
 ├── docker-compose.yml       
-├── hq_server/              
+├── hq_server/
+│   ├── database.py
 │   ├── Dockerfile
 │   ├── requirements.txt
 │   └── main.py             
@@ -37,12 +38,16 @@ This project uses Docker Compose to simulate a distributed network on your local
     ```
 
 3.  **Monitor the terminal output:**
-    You will see the `hq-server` container boot up the FastAPI application on port 8000. Shortly after, the `branch-101` container will boot and begin sending automated HTTP POST requests every 5 seconds to simulate real-time cash flow synchronization.
+    You will see the `hq-server` container boot up the FastAPI application on port 8000. Shortly after, the `branch-node-101` container will boot and begin sending automated HTTP POST requests containing JSON payloads and Lamport timestamps every 5 seconds.
 
 ## How to Test and Verify
 To confirm the Headquarters is successfully receiving and aggregating the state from the distributed branches:
-1.  Open a web browser.
-2.  Navigate to the HQ status endpoint: `http://localhost:8000/status`
-3.  Refresh the page every few seconds. You should see the `cash_amount` updating in real-time as the branch node processes local transactions.
+1.  Open a web browser or termianl.
+2.  Navigate to the HQ status endpoint: `http://localhost:8000/status` (or use `curl -s http://localhost:8000/status`)
+3.  Refresh the page every few seconds. You should see the `current_balance` updating in real-time, alongside an incrementing `hq_clock` integer representing the Lamport logical time.
 
-To shut down the network, press `Ctrl + C` in the terminal where Docker is running, or use the Docker extension in your editor to stop the containers.
+## Teardown
+To shut down the network and remove the containers, run:
+```bash
+docker-compose down
+```
