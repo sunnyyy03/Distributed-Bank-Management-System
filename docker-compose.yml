@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   hq-server:
     build: ./hq_server
