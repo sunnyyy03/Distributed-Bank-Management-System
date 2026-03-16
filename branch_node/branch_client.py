@@ -1,32 +1,67 @@
 """
 Branch Client — autonomous node that simulates local cash transactions.
 
-Periodically generates a random cash-reserve balance and reports it to the
-HQ Central Server over HTTP.  Implements a Lamport Logical Clock to maintain
-distributed event ordering with the HQ node.
+Periodically generates a random cash-reserve balance and publishes it to a
+RabbitMQ queue for the HQ Central Server to consume.  Implements a Lamport
+Logical Clock to maintain distributed event ordering.
 """
 
+import json
 import os
 import random
 import time
 
-import requests
+import pika
 
 # Read configuration from Docker environment variables
-HQ_URL = os.getenv("HQ_URL", "http://hq-server:8000")
 BRANCH_ID = os.getenv("BRANCH_ID", "101")
+RABBITMQ_HOST = os.getenv("RABBITMQ_HOST", "rabbitmq")
+QUEUE_NAME = "branch_updates"
+
+
+def connect_to_rabbitmq():
+    """Establish a connection to RabbitMQ with retry logic.
+
+    RabbitMQ may take a few extra seconds to boot inside Docker, so
+    this function retries with exponential backoff up to ~60 seconds.
+    """
+    max_retries = 10
+    delay = 2  # initial delay in seconds
+
+    for attempt in range(1, max_retries + 1):
+        try:
+            connection = pika.BlockingConnection(
+                pika.ConnectionParameters(host=RABBITMQ_HOST)
+            )
+            print(f"Branch {BRANCH_ID}: Connected to RabbitMQ on attempt {attempt}.")
+            return connection
+        except pika.exceptions.AMQPConnectionError:
+            print(
+                f"Branch {BRANCH_ID}: RabbitMQ not ready "
+                f"(attempt {attempt}/{max_retries}). Retrying in {delay}s..."
+            )
+            time.sleep(delay)
+            delay = min(delay * 2, 30)  # cap at 30 seconds
+
+    raise RuntimeError(
+        f"Branch {BRANCH_ID}: Could not connect to RabbitMQ "
+        f"after {max_retries} attempts."
+    )
 
 
 def run_branch():
-    """Run the branch sync loop indefinitely.
+    """Run the branch publish loop indefinitely.
 
     On each iteration the branch:
     1. Increments its local Lamport clock (a local event occurred).
     2. Generates a random cash balance to simulate transactions.
-    3. Sends the update to HQ and synchronizes its clock with the
-       HQ clock returned in the response.
+    3. Publishes the update to the ``branch_updates`` RabbitMQ queue.
     """
     print(f"Starting Branch {BRANCH_ID} Node...")
+
+    connection = connect_to_rabbitmq()
+    channel = connection.channel()
+    channel.queue_declare(queue=QUEUE_NAME)
 
     # Initialize Branch Lamport Clock
     lamport_clock = 0
@@ -43,22 +78,22 @@ def run_branch():
         }
 
         try:
-            response = requests.post(f"{HQ_URL}/update_cash", json=payload)
-            print(
-                f"Branch {BRANCH_ID} (Clock: {lamport_clock}) sent update: "
-                f"${current_cash} | HQ Response: {response.status_code}"
+            channel.basic_publish(
+                exchange="",
+                routing_key=QUEUE_NAME,
+                body=json.dumps(payload),
             )
+            print(
+                f"Branch {BRANCH_ID} (Clock: {lamport_clock}) published update: "
+                f"${current_cash}"
+            )
+        except pika.exceptions.AMQPError as e:
+            print(f"Branch {BRANCH_ID} publish error: {e}. Reconnecting...")
+            connection = connect_to_rabbitmq()
+            channel = connection.channel()
+            channel.queue_declare(queue=QUEUE_NAME)
 
-            # Keep branch clock synchronized with HQ clock
-            if response.status_code == 200:
-                hq_clock = response.json().get("hq_clock", 0)
-                if hq_clock > 0:
-                    lamport_clock = max(lamport_clock, hq_clock)
-
-        except requests.exceptions.RequestException as e:
-            print(f"Branch {BRANCH_ID} failed to connect to HQ: {e}")
-
-        # Wait 5 seconds before syncing again
+        # Wait 5 seconds before publishing again
         time.sleep(5)
 
 

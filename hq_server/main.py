@@ -1,14 +1,19 @@
 """
 HQ Central Server — FastAPI application for the Bank HQ node.
 
-Receives cash-level updates from branch nodes, persists them in SQLite,
-and exposes a network-wide status dashboard via REST API.
+Consumes cash-level updates from branch nodes via a RabbitMQ queue,
+persists them in SQLite, and exposes a network-wide status dashboard
+via REST API.
 
 Implements a Lamport Logical Clock for distributed event ordering.
 """
 
+import json
+import threading
+import time
+
+import pika
 from fastapi import FastAPI
-from pydantic import BaseModel
 
 import database
 
@@ -20,37 +25,85 @@ database.init_db()
 # Initialize HQ Lamport Clock
 hq_lamport_clock = 0
 
-
-class CashUpdate(BaseModel):
-    """Schema for incoming cash-level reports from branch nodes."""
-
-    branch_id: str
-    cash_amount: float
-    lamport_clock: int
+RABBITMQ_HOST = "rabbitmq"
+QUEUE_NAME = "branch_updates"
 
 
-@app.post("/update_cash")
-def update_cash(data: CashUpdate):
-    """Receive and persist a cash-level update from a branch node."""
+def connect_to_rabbitmq():
+    """Establish a connection to RabbitMQ with retry logic.
+
+    RabbitMQ may take a few extra seconds to boot inside Docker, so
+    this function retries with exponential backoff up to ~60 seconds.
+    """
+    max_retries = 10
+    delay = 2  # initial delay in seconds
+
+    for attempt in range(1, max_retries + 1):
+        try:
+            connection = pika.BlockingConnection(
+                pika.ConnectionParameters(host=RABBITMQ_HOST)
+            )
+            print(f"HQ: Connected to RabbitMQ on attempt {attempt}.")
+            return connection
+        except pika.exceptions.AMQPConnectionError:
+            print(
+                f"HQ: RabbitMQ not ready "
+                f"(attempt {attempt}/{max_retries}). Retrying in {delay}s..."
+            )
+            time.sleep(delay)
+            delay = min(delay * 2, 30)  # cap at 30 seconds
+
+    raise RuntimeError(
+        f"HQ: Could not connect to RabbitMQ after {max_retries} attempts."
+    )
+
+
+def _on_message(ch, method, properties, body):
+    """Callback invoked for each message consumed from the queue.
+
+    Applies the same Lamport clock synchronization and database write
+    logic that was previously handled by the /update_cash POST endpoint.
+    """
     global hq_lamport_clock
+
+    data = json.loads(body)
+    branch_id = data["branch_id"]
+    cash_amount = data["cash_amount"]
+    received_clock = data["lamport_clock"]
 
     # Lamport Logical Clock Algorithm: take the max of local and
     # received clocks, then increment by one.
-    hq_lamport_clock = max(hq_lamport_clock, data.lamport_clock) + 1
+    hq_lamport_clock = max(hq_lamport_clock, received_clock) + 1
 
     # Save the data persistently to SQLite
-    database.update_branch_cash(data.branch_id, data.cash_amount)
+    database.update_branch_cash(branch_id, cash_amount)
 
     print(
-        f"HQ Log: Branch {data.branch_id} synced. "
+        f"HQ Log: Branch {branch_id} synced. "
         f"HQ Clock updated to {hq_lamport_clock} | "
-        f"Recorded: ${data.cash_amount}"
+        f"Recorded: ${cash_amount}"
     )
-    return {
-        "status": "success",
-        "recorded_amount": data.cash_amount,
-        "hq_clock": hq_lamport_clock,
-    }
+
+    ch.basic_ack(delivery_tag=method.delivery_tag)
+
+
+def _consume_loop():
+    """Background thread: connect to RabbitMQ and consume messages forever."""
+    connection = connect_to_rabbitmq()
+    channel = connection.channel()
+    channel.queue_declare(queue=QUEUE_NAME)
+
+    channel.basic_consume(queue=QUEUE_NAME, on_message_callback=_on_message)
+
+    print("HQ: Waiting for branch updates on RabbitMQ...")
+    channel.start_consuming()
+
+
+@app.on_event("startup")
+def start_rabbitmq_consumer():
+    """Launch the RabbitMQ consumer in a daemon background thread."""
+    consumer_thread = threading.Thread(target=_consume_loop, daemon=True)
+    consumer_thread.start()
 
 
 @app.get("/status")

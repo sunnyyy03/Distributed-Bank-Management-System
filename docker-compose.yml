@@ -1,9 +1,20 @@
 services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq-broker
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - bank-network
+
   hq-server:
     build: ./hq_server
     container_name: hq-central-server
     ports:
       - "8000:8000"
+    depends_on:
+      - rabbitmq
     networks:
       - bank-network
 
@@ -11,9 +22,8 @@ services:
     build: ./branch_node
     container_name: branch-node-101
     depends_on:
-      - hq-server
+      - rabbitmq
     environment:
-      - HQ_URL=http://hq-server:8000
       - BRANCH_ID=101
     networks:
       - bank-network
