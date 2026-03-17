@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bank HQ — Real-Time Dashboard</title>
+  <meta name="description" content="Real-time monitoring dashboard for the Distributed Bank Management System Headquarters." />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+          colors: {
+            surface: { 800: '#1a1d23', 700: '#22262e', 600: '#2a2f38' },
+            accent: { 400: '#60a5fa', 500: '#3b82f6', 600: '#2563eb' },
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    body { font-family: 'Inter', system-ui, sans-serif; }
+    /* Subtle pulse for the live indicator dot */
+    @keyframes livePulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: .5; transform: scale(1.4); }
+    }
+    .live-dot { animation: livePulse 1.6s ease-in-out infinite; }
+    /* Smooth shimmer on clock digits */
+    @keyframes shimmer {
+      0% { background-position: -200% center; }
+      100% { background-position: 200% center; }
+    }
+    .clock-shimmer {
+      background: linear-gradient(90deg, #60a5fa 0%, #a78bfa 40%, #60a5fa 80%);
+      background-size: 200% auto;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: shimmer 3s linear infinite;
+    }
+    /* Card border glow for warnings */
+    @keyframes warningPulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,.25); }
+      50% { box-shadow: 0 0 20px 4px rgba(239,68,68,.35); }
+    }
+    .warning-card { animation: warningPulse 2s ease-in-out infinite; }
+    /* Fade-in for cards */
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+    .fade-up { animation: fadeUp .4s ease-out both; }
+  </style>
+</head>
+
+<body class="bg-surface-800 text-gray-200 min-h-screen antialiased">
+
+  <!-- ===== Top Navigation Bar ===== -->
+  <nav class="sticky top-0 z-50 bg-surface-700/80 backdrop-blur-md border-b border-white/5">
+    <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <!-- Bank icon -->
+        <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-accent-500 to-indigo-500 flex items-center justify-center shadow-lg shadow-accent-500/20">
+          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 14v4M12 14v4M16 14v4"/>
+          </svg>
+        </div>
+        <h1 class="text-lg font-bold tracking-tight text-white">Bank HQ <span class="text-accent-400 font-medium">Dashboard</span></h1>
+      </div>
+      <!-- Live indicator -->
+      <div id="connection-status" class="flex items-center gap-2 text-xs font-medium text-emerald-400">
+        <span class="live-dot inline-block w-2 h-2 rounded-full bg-emerald-400"></span>
+        LIVE
+      </div>
+    </div>
+  </nav>
+
+  <main class="max-w-7xl mx-auto px-6 py-10 space-y-10">
+
+    <!-- ===== Global System Clock ===== -->
+    <section id="clock-section" class="text-center space-y-2">
+      <p class="text-xs font-semibold uppercase tracking-widest text-gray-500">Global System Clock (Lamport)</p>
+      <p id="hq-clock" class="text-7xl font-extrabold clock-shimmer tabular-nums">--</p>
+      <p id="last-update" class="text-xs text-gray-600">Waiting for data…</p>
+    </section>
+
+    <!-- ===== Summary Stats Bar ===== -->
+    <section class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div class="bg-surface-700 rounded-xl p-5 border border-white/5">
+        <p class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">Total Branches</p>
+        <p id="stat-branches" class="text-2xl font-bold text-white">--</p>
+      </div>
+      <div class="bg-surface-700 rounded-xl p-5 border border-white/5">
+        <p class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">Network Liquidity</p>
+        <p id="stat-liquidity" class="text-2xl font-bold text-emerald-400">--</p>
+      </div>
+      <div class="bg-surface-700 rounded-xl p-5 border border-white/5">
+        <p class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">Active Warnings</p>
+        <p id="stat-warnings" class="text-2xl font-bold text-red-400">--</p>
+      </div>
+    </section>
+
+    <!-- ===== Branch Grid ===== -->
+    <section>
+      <h2 class="text-sm font-semibold uppercase tracking-widest text-gray-500 mb-4">Branch Network</h2>
+      <div id="branch-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        <!-- Cards injected dynamically by JS -->
+        <p id="branch-placeholder" class="col-span-full text-center text-gray-600 py-16">Loading branch data…</p>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ===== Footer ===== -->
+  <footer class="max-w-7xl mx-auto px-6 py-8 text-center text-xs text-gray-600 border-t border-white/5">
+    Distributed Bank Management System &middot; Polling every 2 s
+  </footer>
+
+  <!-- ===== JavaScript: Polling & Rendering ===== -->
+  <script>
+    const API_URL = 'http://localhost:8000/status';
+    const POLL_INTERVAL = 2000; // 2 seconds
+
+    /**
+     * Format a number as USD currency string, e.g. 24055.01 → "$24,055.01"
+     */
+    function formatCurrency(value) {
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
+    }
+
+    /**
+     * Build the HTML for a single branch card.
+     * If the balance is below the threshold the card turns red with a warning badge.
+     */
+    function buildCard(branch, index) {
+      const isWarning = branch.current_balance < branch.minimum_threshold;
+
+      // Pick colours based on liquidity status
+      const border  = isWarning ? 'border-red-500/40' : 'border-white/5';
+      const bg      = isWarning ? 'bg-red-950/30'     : 'bg-surface-700';
+      const glow    = isWarning ? 'warning-card'       : '';
+      const balCol  = isWarning ? 'text-red-400'       : 'text-emerald-400';
+
+      return `
+        <div class="fade-up ${bg} ${glow} rounded-2xl p-6 border ${border} transition-all duration-300 relative overflow-hidden"
+             style="animation-delay: ${index * 80}ms">
+          ${isWarning ? `
+            <div class="absolute top-3 right-3 flex items-center gap-1.5 bg-red-500/20 text-red-400 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border border-red-500/30">
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+              Liquidity Warning
+            </div>` : ''}
+
+          <p class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">Branch</p>
+          <p class="text-3xl font-extrabold text-white mb-4">${branch.branch_id}</p>
+
+          <div class="space-y-3">
+            <div>
+              <p class="text-[11px] font-medium uppercase tracking-wider text-gray-500">Current Balance</p>
+              <p class="text-xl font-bold ${balCol} tabular-nums">${formatCurrency(branch.current_balance)}</p>
+            </div>
+            <div>
+              <p class="text-[11px] font-medium uppercase tracking-wider text-gray-500">Min. Threshold</p>
+              <p class="text-sm font-semibold text-gray-400 tabular-nums">${formatCurrency(branch.minimum_threshold)}</p>
+            </div>
+          </div>
+
+          <!-- Health bar -->
+          <div class="mt-5">
+            <div class="w-full h-1.5 rounded-full bg-surface-600 overflow-hidden">
+              <div class="h-full rounded-full transition-all duration-700 ${isWarning ? 'bg-red-500' : 'bg-emerald-500'}"
+                   style="width: ${Math.min((branch.current_balance / (branch.minimum_threshold * 3)) * 100, 100)}%"></div>
+            </div>
+          </div>
+        </div>`;
+    }
+
+    /**
+     * Fetch the latest status from the API and re-render the dashboard.
+     */
+    async function fetchAndRender() {
+      try {
+        const res = await fetch(API_URL);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        // --- Update Lamport clock ---
+        document.getElementById('hq-clock').textContent = data.hq_clock;
+
+        // --- Update timestamp ---
+        const now = new Date();
+        document.getElementById('last-update').textContent =
+          `Last updated ${now.toLocaleTimeString()}`;
+
+        // --- Summary stats ---
+        const branches = data.network_status || [];
+        const totalLiquidity = branches.reduce((s, b) => s + b.current_balance, 0);
+        const warningCount = branches.filter(b => b.current_balance < b.minimum_threshold).length;
+
+        document.getElementById('stat-branches').textContent = branches.length;
+        document.getElementById('stat-liquidity').textContent = formatCurrency(totalLiquidity);
+
+        const warnEl = document.getElementById('stat-warnings');
+        warnEl.textContent = warningCount;
+        warnEl.className = warningCount > 0
+          ? 'text-2xl font-bold text-red-400'
+          : 'text-2xl font-bold text-emerald-400';
+
+        // --- Build branch cards ---
+        const grid = document.getElementById('branch-grid');
+        grid.innerHTML = branches.map((b, i) => buildCard(b, i)).join('');
+
+        // --- Connection indicator ---
+        const status = document.getElementById('connection-status');
+        status.innerHTML = '<span class="live-dot inline-block w-2 h-2 rounded-full bg-emerald-400"></span> LIVE';
+        status.className = 'flex items-center gap-2 text-xs font-medium text-emerald-400';
+
+      } catch (err) {
+        console.error('Dashboard fetch error:', err);
+        const status = document.getElementById('connection-status');
+        status.innerHTML = '<span class="inline-block w-2 h-2 rounded-full bg-red-500"></span> OFFLINE';
+        status.className = 'flex items-center gap-2 text-xs font-medium text-red-400';
+      }
+    }
+
+    // Initial fetch + start polling every 2 seconds
+    fetchAndRender();
+    setInterval(fetchAndRender, POLL_INTERVAL);
+  </script>
+</body>
+</html>
