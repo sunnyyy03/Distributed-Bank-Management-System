@@ -5,12 +5,16 @@ Consumes cash-level updates from branch nodes via a RabbitMQ queue,
 persists them in SQLite, and exposes a network-wide status dashboard
 via REST API.
 
+Acts as the Transaction Coordinator for the Two-Phase Commit (2PC)
+protocol used for inter-branch cash transfers.
+
 Implements a Lamport Logical Clock for distributed event ordering.
 """
 
 import json
 import threading
 import time
+import uuid
 
 import pika
 from fastapi import FastAPI
@@ -28,6 +32,21 @@ hq_lamport_clock = 0
 RABBITMQ_HOST = "rabbitmq"
 QUEUE_NAME = "branch_updates"
 
+# -----------------------------------------------------------------
+# 2PC Configuration
+# -----------------------------------------------------------------
+TRANSFER_QUEUE = "transfer_requests"     # Branch → HQ transfer requests
+HQ_TX_REPLIES = "hq_tx_replies"          # Branch → HQ vote replies
+VOTE_TIMEOUT = 3                         # Max seconds to wait for votes
+
+# Thread-safe storage for incoming votes keyed by correlation_id
+_vote_lock = threading.Lock()
+_votes: dict[str, list[dict]] = {}
+
+
+# =================================================================
+# RabbitMQ Connection Helper
+# =================================================================
 
 def connect_to_rabbitmq():
     """Establish a connection to RabbitMQ with retry logic.
@@ -58,11 +77,14 @@ def connect_to_rabbitmq():
     )
 
 
-def _on_message(ch, method, properties, body):
-    """Callback invoked for each message consumed from the queue.
+# =================================================================
+# Branch-Updates Consumer (existing AMQP pipeline)
+# =================================================================
 
-    Applies the same Lamport clock synchronization and database write
-    logic that was previously handled by the /update_cash POST endpoint.
+def _on_branch_update(ch, method, properties, body):
+    """Callback for each message consumed from the branch_updates queue.
+
+    Applies Lamport clock synchronization and writes to the database.
     """
     global hq_lamport_clock
 
@@ -71,8 +93,7 @@ def _on_message(ch, method, properties, body):
     cash_amount = data["cash_amount"]
     received_clock = data["lamport_clock"]
 
-    # Lamport Logical Clock Algorithm: take the max of local and
-    # received clocks, then increment by one.
+    # Lamport Logical Clock Algorithm
     hq_lamport_clock = max(hq_lamport_clock, received_clock) + 1
 
     # Save the data persistently to SQLite
@@ -87,23 +108,226 @@ def _on_message(ch, method, properties, body):
     ch.basic_ack(delivery_tag=method.delivery_tag)
 
 
-def _consume_loop():
-    """Background thread: connect to RabbitMQ and consume messages forever."""
+def _branch_updates_loop():
+    """Background thread: consume from branch_updates forever."""
     connection = connect_to_rabbitmq()
     channel = connection.channel()
     channel.queue_declare(queue=QUEUE_NAME)
 
-    channel.basic_consume(queue=QUEUE_NAME, on_message_callback=_on_message)
+    channel.basic_consume(queue=QUEUE_NAME, on_message_callback=_on_branch_update)
 
     print("HQ: Waiting for branch updates on RabbitMQ...")
     channel.start_consuming()
 
 
+# =================================================================
+# 2PC — Vote Reply Consumer
+# =================================================================
+
+def _on_vote_reply(ch, method, properties, body):
+    """Callback for vote replies arriving on hq_tx_replies.
+
+    Stores each vote in the _votes dict keyed by correlation_id so
+    the coordinator thread can collect them.
+    """
+    vote = json.loads(body)
+    corr_id = properties.correlation_id
+
+    with _vote_lock:
+        if corr_id not in _votes:
+            _votes[corr_id] = []
+        _votes[corr_id].append(vote)
+
+    print(
+        f"HQ 2PC: Received vote from Branch {vote.get('branch_id')}: "
+        f"{vote.get('vote')} (tx={corr_id[:8]}...)"
+    )
+
+    ch.basic_ack(delivery_tag=method.delivery_tag)
+
+
+def _vote_reply_loop():
+    """Background thread: consume vote replies from hq_tx_replies."""
+    connection = connect_to_rabbitmq()
+    channel = connection.channel()
+    channel.queue_declare(queue=HQ_TX_REPLIES)
+
+    channel.basic_consume(queue=HQ_TX_REPLIES, on_message_callback=_on_vote_reply)
+
+    print("HQ 2PC: Listening for vote replies on hq_tx_replies...")
+    channel.start_consuming()
+
+
+# =================================================================
+# 2PC — Transfer Request Consumer  (Transaction Coordinator)
+# =================================================================
+
+def _on_transfer_request(ch, method, properties, body):
+    """Callback for each transfer request.
+
+    Orchestrates the full Two-Phase Commit protocol:
+      Phase 1 — PREPARE: send PREPARE to both branches, collect votes.
+      Phase 2 — COMMIT or ABORT based on votes.
+    """
+    global hq_lamport_clock
+
+    data = json.loads(body)
+    sender_id = str(data["sender_id"])
+    receiver_id = str(data["receiver_id"])
+    amount = data["amount"]
+    tx_id = str(uuid.uuid4())  # unique transaction identifier
+
+    print(
+        f"\nHQ 2PC: Transfer request received — "
+        f"Branch {sender_id} → Branch {receiver_id}: ${amount}  "
+        f"(tx={tx_id[:8]}...)"
+    )
+
+    # Initialize vote collection for this transaction
+    with _vote_lock:
+        _votes[tx_id] = []
+
+    # ----------------------------------------------------------
+    # Phase 1 — PREPARE
+    # ----------------------------------------------------------
+    # We need a separate connection for publishing because pika
+    # BlockingConnection is not thread-safe; this callback runs on
+    # the transfer-request consumer thread.
+    pub_conn = connect_to_rabbitmq()
+    pub_channel = pub_conn.channel()
+
+    prepare_payload = json.dumps({
+        "type": "PREPARE",
+        "tx_id": tx_id,
+        "sender_id": sender_id,
+        "receiver_id": receiver_id,
+        "amount": amount,
+    })
+
+    sender_queue = f"branch_{sender_id}_coordinator"
+    receiver_queue = f"branch_{receiver_id}_coordinator"
+
+    # Declare the participant queues (idempotent)
+    pub_channel.queue_declare(queue=sender_queue)
+    pub_channel.queue_declare(queue=receiver_queue)
+
+    # Send PREPARE to both branches with reply_to and correlation_id
+    for queue in [sender_queue, receiver_queue]:
+        pub_channel.basic_publish(
+            exchange="",
+            routing_key=queue,
+            body=prepare_payload,
+            properties=pika.BasicProperties(
+                reply_to=HQ_TX_REPLIES,
+                correlation_id=tx_id,
+            ),
+        )
+
+    print(
+        f"HQ 2PC: PREPARE sent to {sender_queue} and {receiver_queue}  "
+        f"(tx={tx_id[:8]}...)"
+    )
+
+    # ----------------------------------------------------------
+    # Collect votes (wait up to VOTE_TIMEOUT seconds)
+    # ----------------------------------------------------------
+    deadline = time.time() + VOTE_TIMEOUT
+    while time.time() < deadline:
+        with _vote_lock:
+            if len(_votes.get(tx_id, [])) >= 2:
+                break
+        time.sleep(0.2)  # poll interval
+
+    # Gather collected votes
+    with _vote_lock:
+        collected = _votes.pop(tx_id, [])
+
+    # ----------------------------------------------------------
+    # Phase 2 — Decision
+    # ----------------------------------------------------------
+    all_yes = (
+        len(collected) == 2
+        and all(v.get("vote") == "YES" for v in collected)
+    )
+
+    if all_yes:
+        # Execute the atomic transfer in SQLite
+        success = database.atomic_transfer(sender_id, receiver_id, amount)
+
+        if success:
+            decision = "COMMIT"
+            print(
+                f"HQ 2PC: All votes YES — COMMIT. Atomic transfer executed.  "
+                f"(tx={tx_id[:8]}...)"
+            )
+        else:
+            decision = "ABORT"
+            print(
+                f"HQ 2PC: DB transfer failed — ABORT.  "
+                f"(tx={tx_id[:8]}...)"
+            )
+    else:
+        decision = "ABORT"
+        vote_summary = [
+            f"Branch {v.get('branch_id')}={v.get('vote')}" for v in collected
+        ]
+        print(
+            f"HQ 2PC: ABORT — votes received: {vote_summary} "
+            f"(needed 2× YES)  (tx={tx_id[:8]}...)"
+        )
+
+    # Broadcast the decision to both participant branches
+    decision_payload = json.dumps({
+        "type": decision,
+        "tx_id": tx_id,
+        "sender_id": sender_id,
+        "receiver_id": receiver_id,
+        "amount": amount,
+    })
+
+    for queue in [sender_queue, receiver_queue]:
+        pub_channel.basic_publish(
+            exchange="",
+            routing_key=queue,
+            body=decision_payload,
+        )
+
+    print(
+        f"HQ 2PC: {decision} broadcast to {sender_queue} and {receiver_queue}  "
+        f"(tx={tx_id[:8]}...)"
+    )
+
+    pub_conn.close()
+    ch.basic_ack(delivery_tag=method.delivery_tag)
+
+
+def _transfer_request_loop():
+    """Background thread: consume from transfer_requests queue."""
+    connection = connect_to_rabbitmq()
+    channel = connection.channel()
+    channel.queue_declare(queue=TRANSFER_QUEUE)
+
+    channel.basic_consume(
+        queue=TRANSFER_QUEUE, on_message_callback=_on_transfer_request
+    )
+
+    print("HQ 2PC: Listening for transfer requests...")
+    channel.start_consuming()
+
+
+# =================================================================
+# FastAPI Startup & Endpoints
+# =================================================================
+
 @app.on_event("startup")
-def start_rabbitmq_consumer():
-    """Launch the RabbitMQ consumer in a daemon background thread."""
-    consumer_thread = threading.Thread(target=_consume_loop, daemon=True)
-    consumer_thread.start()
+def start_background_consumers():
+    """Launch all RabbitMQ consumer threads as daemons at startup."""
+    # 1. Branch-updates consumer (existing pipeline)
+    threading.Thread(target=_branch_updates_loop, daemon=True).start()
+    # 2. Vote-reply consumer for 2PC
+    threading.Thread(target=_vote_reply_loop, daemon=True).start()
+    # 3. Transfer-request consumer (2PC coordinator)
+    threading.Thread(target=_transfer_request_loop, daemon=True).start()
 
 
 @app.get("/status")

@@ -2,7 +2,8 @@
 Database module — SQLite persistence layer for the Bank HQ Server.
 
 Manages the Branches, Cash_Reserves, and Employees tables and provides
-helper functions for reading and writing cash-reserve data.
+helper functions for reading and writing cash-reserve data, including
+atomic inter-branch transfers for the Two-Phase Commit protocol.
 """
 
 import sqlite3
@@ -13,8 +14,8 @@ DB_FILE = "bank_data.db"
 def init_db():
     """Initialize the database and create the required tables.
 
-    Seeds Branch 101 with a starting balance of $0.00 and a minimum
-    cash-reserve threshold of $10,000.
+    Seeds Branch 101 and Branch 102 with starting balances of $0.00 and
+    a minimum cash-reserve threshold of $10,000.
     """
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
@@ -50,16 +51,24 @@ def init_db():
         )
     """)
 
-    # Seed Branch 101 so the branch node has a valid foreign key
+    # Seed Branch 101
     cursor.execute("""
         INSERT OR IGNORE INTO Branches (branch_id, location_name, branch_size)
         VALUES ('101', 'HQ Local Branch', 'Large')
     """)
-
-    # Insert an initial cash record with a $10,000 minimum threshold
     cursor.execute("""
         INSERT OR IGNORE INTO Cash_Reserves (branch_id, current_balance, minimum_threshold)
         VALUES ('101', 0.0, 10000.0)
+    """)
+
+    # Seed Branch 102
+    cursor.execute("""
+        INSERT OR IGNORE INTO Branches (branch_id, location_name, branch_size)
+        VALUES ('102', 'Downtown Branch', 'Medium')
+    """)
+    cursor.execute("""
+        INSERT OR IGNORE INTO Cash_Reserves (branch_id, current_balance, minimum_threshold)
+        VALUES ('102', 0.0, 10000.0)
     """)
 
     conn.commit()
@@ -80,6 +89,54 @@ def update_branch_cash(branch_id: str, amount: float):
     )
     conn.commit()
     conn.close()
+
+
+def atomic_transfer(sender_id: str, receiver_id: str, amount: float) -> bool:
+    """Execute an atomic inter-branch cash transfer.
+
+    Deducts ``amount`` from the sender's current_balance and adds it to
+    the receiver's current_balance inside a single SQLite transaction.
+
+    Returns True on success, False if the sender has insufficient funds
+    or any database error occurs.
+    """
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+
+    try:
+        # Begin an explicit transaction for atomicity
+        cursor.execute("BEGIN")
+
+        # Read the sender's current balance
+        cursor.execute(
+            "SELECT current_balance FROM Cash_Reserves WHERE branch_id = ?",
+            (sender_id,),
+        )
+        sender_row = cursor.fetchone()
+        if sender_row is None or sender_row[0] < amount:
+            conn.rollback()
+            return False
+
+        # Deduct from the sender
+        cursor.execute(
+            "UPDATE Cash_Reserves SET current_balance = current_balance - ? WHERE branch_id = ?",
+            (amount, sender_id),
+        )
+
+        # Credit the receiver
+        cursor.execute(
+            "UPDATE Cash_Reserves SET current_balance = current_balance + ? WHERE branch_id = ?",
+            (amount, receiver_id),
+        )
+
+        conn.commit()
+        return True
+
+    except sqlite3.Error:
+        conn.rollback()
+        return False
+    finally:
+        conn.close()
 
 
 def get_all_cash_status():
