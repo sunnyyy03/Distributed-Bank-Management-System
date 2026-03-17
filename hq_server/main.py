@@ -18,10 +18,20 @@ import uuid
 
 import pika
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 import database
 
 app = FastAPI(title="Bank HQ Server")
+
+# Allow the frontend to fetch data without browser security blocks
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  
+    allow_credentials=True,
+    allow_methods=["*"],  
+    allow_headers=["*"], 
+)
 
 # Initialize the SQLite database as soon as the API server starts
 database.init_db()
