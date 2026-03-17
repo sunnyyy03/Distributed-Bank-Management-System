@@ -28,6 +28,16 @@ services:
     networks:
       - bank-network
 
+  branch-102:
+    build: ./branch_node
+    container_name: branch-node-102
+    depends_on:
+      - rabbitmq
+    environment:
+      - BRANCH_ID=102
+    networks:
+      - bank-network
+
 networks:
   bank-network:
     driver: bridge
