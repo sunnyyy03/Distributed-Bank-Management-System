@@ -71,6 +71,34 @@ def init_db():
         VALUES ('102', 0.0, 10000.0)
     """)
 
+    # ------------------------------------------------------------------
+    # Seed Employees
+    # ------------------------------------------------------------------
+    # Branch 101 (Large): 1 Manager, 3 Tellers, 2 Security
+    employees_101 = [
+        ("E1001", "101", "Alice Johnson",  "Manager"),
+        ("E1002", "101", "Bob Smith",      "Teller"),
+        ("E1003", "101", "Carol Davis",    "Teller"),
+        ("E1004", "101", "David Lee",      "Teller"),
+        ("E1005", "101", "Eva Martinez",   "Security"),
+        ("E1006", "101", "Frank Wilson",   "Security"),
+    ]
+
+    # Branch 102 (Medium): 1 Manager, 2 Tellers, 1 Security
+    employees_102 = [
+        ("E2001", "102", "Grace Kim",      "Manager"),
+        ("E2002", "102", "Hank Brown",     "Teller"),
+        ("E2003", "102", "Irene Clark",    "Teller"),
+        ("E2004", "102", "James Turner",   "Security"),
+    ]
+
+    for emp in employees_101 + employees_102:
+        cursor.execute(
+            "INSERT OR IGNORE INTO Employees (employee_id, branch_id, name, role) "
+            "VALUES (?, ?, ?, ?)",
+            emp,
+        )
+
     conn.commit()
     conn.close()
 
@@ -157,6 +185,55 @@ def get_all_cash_status():
             "branch_id": r[0],
             "current_balance": r[1],
             "minimum_threshold": r[2],
+        }
+        for r in rows
+    ]
+
+
+def get_employees():
+    """Return every employee record as a list of dictionaries."""
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("SELECT employee_id, branch_id, name, role FROM Employees")
+    rows = cursor.fetchall()
+    conn.close()
+
+    return [
+        {
+            "employee_id": r[0],
+            "branch_id": r[1],
+            "name": r[2],
+            "role": r[3],
+        }
+        for r in rows
+    ]
+
+
+def get_branches_with_volume():
+    """Join Branches and Cash_Reserves to return branch info with live cash data.
+
+    Returns a list of dicts with keys:
+        branch_id, branch_size, current_balance, minimum_threshold
+    """
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT b.branch_id,
+               b.branch_size,
+               cr.current_balance,
+               cr.minimum_threshold
+        FROM   Branches b
+        JOIN   Cash_Reserves cr ON b.branch_id = cr.branch_id
+    """)
+    rows = cursor.fetchall()
+    conn.close()
+
+    return [
+        {
+            "branch_id": r[0],
+            "branch_size": r[1],
+            "current_balance": r[2],
+            "minimum_threshold": r[3],
         }
         for r in rows
     ]
