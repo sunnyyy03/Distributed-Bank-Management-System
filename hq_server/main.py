@@ -21,6 +21,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 import database
+import scheduler
 
 app = FastAPI(title="Bank HQ Server")
 
@@ -345,3 +346,9 @@ def get_status():
     """Return the aggregated cash status of all branches."""
     status = database.get_all_cash_status()
     return {"network_status": status, "hq_clock": hq_lamport_clock}
+
+
+@app.get("/schedule")
+def get_schedule():
+    """Return the dynamically generated weekly shift schedule."""
+    return scheduler.generate_weekly_schedule()
