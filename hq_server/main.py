@@ -17,8 +17,9 @@ import time
 import uuid
 
 import pika
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 import database
 import scheduler
@@ -53,6 +54,16 @@ VOTE_TIMEOUT = 3                         # Max seconds to wait for votes
 # Thread-safe storage for incoming votes keyed by correlation_id
 _vote_lock = threading.Lock()
 _votes: dict[str, list[dict]] = {}
+
+
+# -----------------------------------------------------------------
+# Pydantic Models
+# -----------------------------------------------------------------
+
+class EmployeeCreate(BaseModel):
+    branch_id: str
+    name: str
+    role: str
 
 
 # =================================================================
@@ -352,3 +363,33 @@ def get_status():
 def get_schedule():
     """Return the dynamically generated weekly shift schedule."""
     return scheduler.generate_weekly_schedule()
+
+
+# =================================================================
+# Employee CRUD Endpoints
+# =================================================================
+
+@app.get("/employees")
+def list_employees():
+    """Return the list of all current employees."""
+    return database.get_employees()
+
+
+@app.post("/employee")
+def hire_employee(payload: EmployeeCreate):
+    """Add a new employee record and return the generated ID."""
+    new_id = database.add_employee(
+        branch_id=payload.branch_id,
+        name=payload.name,
+        role=payload.role,
+    )
+    return {"message": f"Employee {new_id} added successfully.", "employee_id": new_id}
+
+
+@app.delete("/employee/{employee_id}")
+def fire_employee(employee_id: str):
+    """Remove an employee by ID. Returns 404 if the ID does not exist."""
+    deleted = database.remove_employee(employee_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail=f"Employee {employee_id} not found.")
+    return {"message": f"Employee {employee_id} removed successfully."}

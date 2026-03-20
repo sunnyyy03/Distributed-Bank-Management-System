@@ -7,6 +7,7 @@ atomic inter-branch transfers for the Two-Phase Commit protocol.
 """
 
 import sqlite3
+import uuid
 
 DB_FILE = "bank_data.db"
 
@@ -207,6 +208,41 @@ def get_employees():
         }
         for r in rows
     ]
+
+
+def add_employee(branch_id: str, name: str, role: str) -> str:
+    """Insert a new employee into the Employees table.
+
+    Generates a unique employee_id using uuid4 and returns it.
+    """
+    employee_id = uuid.uuid4().hex[:6].upper()
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO Employees (employee_id, branch_id, name, role) "
+        "VALUES (?, ?, ?, ?)",
+        (employee_id, branch_id, name, role),
+    )
+    conn.commit()
+    conn.close()
+    return employee_id
+
+
+def remove_employee(employee_id: str) -> bool:
+    """Delete an employee by their employee_id.
+
+    Returns True if a row was deleted, False otherwise.
+    """
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute(
+        "DELETE FROM Employees WHERE employee_id = ?",
+        (employee_id,),
+    )
+    deleted = cursor.rowcount > 0
+    conn.commit()
+    conn.close()
+    return deleted
 
 
 def get_branches_with_volume():
