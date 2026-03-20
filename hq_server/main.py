@@ -378,18 +378,24 @@ def list_employees():
 @app.post("/employee")
 def hire_employee(payload: EmployeeCreate):
     """Add a new employee record and return the generated ID."""
-    new_id = database.add_employee(
-        branch_id=payload.branch_id,
-        name=payload.name,
-        role=payload.role,
-    )
+    try:
+        new_id = database.add_employee(
+            branch_id=payload.branch_id,
+            name=payload.name,
+            role=payload.role,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     return {"message": f"Employee {new_id} added successfully.", "employee_id": new_id}
 
 
 @app.delete("/employee/{employee_id}")
 def fire_employee(employee_id: str):
-    """Remove an employee by ID. Returns 404 if the ID does not exist."""
+    """Remove an employee by ID. Returns 404 if the ID does not exist or is a Manager."""
     deleted = database.remove_employee(employee_id)
     if not deleted:
-        raise HTTPException(status_code=404, detail=f"Employee {employee_id} not found.")
+        raise HTTPException(
+            status_code=404,
+            detail=f"Employee {employee_id} not found or is a protected Manager.",
+        )
     return {"message": f"Employee {employee_id} removed successfully."}

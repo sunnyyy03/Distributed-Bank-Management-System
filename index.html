@@ -280,21 +280,21 @@
                 </div>
                 <div class="grid grid-cols-2 gap-4">
                   <div>
+                    <label for="hire-role" class="block text-xs font-medium text-gray-400 mb-1.5">Role</label>
+                    <select id="hire-role" required
+                      class="w-full bg-surface-600 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-accent-500/50 focus:border-accent-500 transition appearance-none">
+                      <option value="Teller">Teller</option>
+                      <option value="Backup">Backup</option>
+                    </select>
+                  </div>
+                  <div id="branch-wrapper">
                     <label for="hire-branch" class="block text-xs font-medium text-gray-400 mb-1.5">Branch</label>
                     <select id="hire-branch" required
                       class="w-full bg-surface-600 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-accent-500/50 focus:border-accent-500 transition appearance-none">
                       <option value="101">101 — HQ Local</option>
                       <option value="102">102 — Downtown</option>
                     </select>
-                  </div>
-                  <div>
-                    <label for="hire-role" class="block text-xs font-medium text-gray-400 mb-1.5">Role</label>
-                    <select id="hire-role" required
-                      class="w-full bg-surface-600 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-accent-500/50 focus:border-accent-500 transition appearance-none">
-                      <option value="Manager">Manager</option>
-                      <option value="Teller">Teller</option>
-                      <option value="Security">Security</option>
-                    </select>
+                    <p id="branch-na" class="hidden w-full bg-surface-600 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-gray-500">N/A</p>
                   </div>
                 </div>
                 <button id="hire-btn" type="submit"
@@ -343,7 +343,7 @@
             </div>
             <h2 class="text-sm font-semibold uppercase tracking-widest text-gray-500">Live Weekly Schedule</h2>
             <div class="ml-auto flex items-center gap-4 text-[10px] font-medium uppercase tracking-wider">
-              <span class="flex items-center gap-1.5"><span class="inline-block w-2.5 h-2.5 rounded-sm bg-sky-500/30 border border-sky-400/40"></span><span class="text-sky-400">Floating Teller</span></span>
+              <span class="flex items-center gap-1.5"><span class="inline-block w-2.5 h-2.5 rounded-sm bg-sky-500/30 border border-sky-400/40"></span><span class="text-sky-400">Backup Staff</span></span>
               <span class="flex items-center gap-1.5"><span class="inline-block w-2.5 h-2.5 rounded-sm bg-red-500/30 border border-red-400/40"></span><span class="text-red-400">Unassigned</span></span>
             </div>
           </div>
@@ -385,6 +385,7 @@
     let isLoggedIn  = false;
     let activeTab   = 'network';   // 'network' | 'workforce'
     let pollTimerId = null;
+    let cachedEmployees = {};      // { employee_id: { role, ... } }
 
     /* ──────────────────────────────────────────────────────────────
        LOGIN
@@ -483,6 +484,23 @@
     });
 
     /* ──────────────────────────────────────────────────────────────
+       HIRE FORM — Role ↔ Branch toggle
+       ────────────────────────────────────────────────────────────── */
+    document.getElementById('hire-role').addEventListener('change', function () {
+      const branchSelect = document.getElementById('hire-branch');
+      const branchNA     = document.getElementById('branch-na');
+      if (this.value === 'Backup') {
+        branchSelect.classList.add('hidden');
+        branchSelect.removeAttribute('required');
+        branchNA.classList.remove('hidden');
+      } else {
+        branchSelect.classList.remove('hidden');
+        branchSelect.setAttribute('required', '');
+        branchNA.classList.add('hidden');
+      }
+    });
+
+    /* ──────────────────────────────────────────────────────────────
        UTILITY
        ────────────────────────────────────────────────────────────── */
     function formatCurrency(value) {
@@ -545,7 +563,7 @@
         const map = {
           'Manager':  'bg-violet-500/20 text-violet-300 border-violet-500/30',
           'Teller':   'bg-sky-500/20 text-sky-300 border-sky-500/30',
-          'Security': 'bg-amber-500/20 text-amber-300 border-amber-500/30',
+          'Backup':   'bg-amber-500/20 text-amber-300 border-amber-500/30',
         };
         return map[role] || 'bg-gray-500/20 text-gray-300 border-gray-500/30';
       };
@@ -554,17 +572,19 @@
         <tr class="row-hover border-b border-white/[.03]">
           <td class="py-2.5 pl-3 text-xs font-mono text-gray-500">${emp.employee_id}</td>
           <td class="py-2.5 font-medium text-white">${emp.name}</td>
-          <td class="py-2.5 text-gray-400">${emp.branch_id}</td>
+          <td class="py-2.5 text-gray-400">${emp.role === 'Backup' ? 'N/A' : emp.branch_id}</td>
           <td class="py-2.5">
             <span class="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full border ${roleBadge(emp.role)}">${emp.role}</span>
           </td>
           <td class="py-2.5 pr-3 text-right">
+            ${emp.role === 'Manager' ? '' : `
             <button onclick="fireEmployee('${emp.employee_id}')" title="Remove employee"
               class="group p-1.5 rounded-lg hover:bg-red-500/20 transition-colors duration-150">
               <svg class="w-4 h-4 text-gray-500 group-hover:text-red-400 transition-colors" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
               </svg>
             </button>
+            `}
           </td>
         </tr>
       `).join('');
@@ -610,7 +630,7 @@
                       }
                       let ths = '';
                       for (let i = 1; i <= maxShifts; i++) {
-                        ths += '<th class="text-left py-2.5 px-3 font-semibold">Shift ' + i + '</th>';
+                        ths += '<th class="text-left py-2.5 px-3 font-semibold"></th>';
                       }
                       return ths;
                     })()}
@@ -629,29 +649,33 @@
                     for (let i = 0; i < maxShifts; i++) {
                       if (i < shifts.length) {
                         const s = shifts[i];
-                        const isFloating = s.role === 'Floating Teller';
-                        const isUnassigned = s.assigned_to && s.assigned_to.includes('UNASSIGNED');
+                        const isUnassigned = s.assigned_to && (s.assigned_to.includes('UNASSIGNED') || s.assigned_to.includes('NEED BACKUP'));
+                        const empRecord = s.employee_id ? cachedEmployees[s.employee_id] : null;
+                        const isBackupEmployee = s.role === 'Backup' || (empRecord && empRecord.role === 'Backup');
 
                         let cellBg = '';
                         let textCol = 'text-gray-300';
                         let roleCol = 'text-gray-500';
-                        if (isFloating) {
-                          cellBg = 'bg-sky-500/10 border border-sky-400/20 rounded-lg';
-                          textCol = 'text-sky-200';
-                          roleCol = 'text-sky-400';
-                        } else if (isUnassigned) {
+                        let displayName = s.assigned_to;
+                        let displayRole = s.role;
+
+                        if (isUnassigned) {
                           cellBg = 'bg-red-500/10 border border-red-400/20 rounded-lg';
                           textCol = 'text-red-300';
                           roleCol = 'text-red-400';
+                          displayName = 'UNASSIGNED';
+                        } else if (isBackupEmployee) {
+                          cellBg = 'bg-sky-500/10 border border-sky-400/20 rounded-lg';
+                          textCol = 'text-sky-200';
+                          roleCol = 'text-sky-400';
+                          displayRole = 'BACKUP';
                         }
-
-                        const displayName = isUnassigned ? 'UNASSIGNED' : s.assigned_to;
 
                         cells += `
                           <td class="py-2.5 px-3">
                             <div class="px-2.5 py-1.5 ${cellBg}">
                               <p class="font-medium ${textCol} text-xs">${displayName}</p>
-                              <p class="${roleCol} text-[10px] uppercase tracking-wider font-semibold">${s.role} · ${s.time}</p>
+                              <p class="${roleCol} text-[10px] uppercase tracking-wider font-semibold">${displayRole}</p>
                             </div>
                           </td>`;
                       } else {
@@ -682,6 +706,11 @@
         const res = await fetch(EMPLOYEES_URL);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const employees = await res.json();
+
+        // Build lookup for schedule cross-reference
+        cachedEmployees = {};
+        employees.forEach(emp => { cachedEmployees[emp.employee_id] = emp; });
+
         renderEmployees(employees);
       } catch (err) {
         console.error('Employee fetch error:', err);
@@ -707,8 +736,8 @@
       btn.textContent = 'Hiring…';
 
       try {
-        const payload = {
-          branch_id: document.getElementById('hire-branch').value,
+      const payload = {
+          branch_id: document.getElementById('hire-role').value === 'Backup' ? '101' : document.getElementById('hire-branch').value,
           name: document.getElementById('hire-name').value.trim(),
           role: document.getElementById('hire-role').value,
         };
