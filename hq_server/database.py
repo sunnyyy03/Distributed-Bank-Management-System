@@ -75,25 +75,26 @@ def init_db():
     # ------------------------------------------------------------------
     # Seed Employees
     # ------------------------------------------------------------------
-    # Branch 101 (Large): 1 Manager, 3 Tellers, 2 Security
+    # Branch 101 (Large): 1 Manager, 2 Tellers
     employees_101 = [
         ("E1001", "101", "Alice Johnson",  "Manager"),
         ("E1002", "101", "Bob Smith",      "Teller"),
         ("E1003", "101", "Carol Davis",    "Teller"),
-        ("E1004", "101", "David Lee",      "Teller"),
-        ("E1005", "101", "Eva Martinez",   "Security"),
-        ("E1006", "101", "Frank Wilson",   "Security"),
     ]
 
-    # Branch 102 (Medium): 1 Manager, 2 Tellers, 1 Security
+    # Branch 102 (Medium): 1 Manager, 1 Teller
     employees_102 = [
         ("E2001", "102", "Grace Kim",      "Manager"),
         ("E2002", "102", "Hank Brown",     "Teller"),
-        ("E2003", "102", "Irene Clark",    "Teller"),
-        ("E2004", "102", "James Turner",   "Security"),
     ]
 
-    for emp in employees_101 + employees_102:
+    # Network Backups (branch-agnostic, assigned to 101 for schema only)
+    backups = [
+        ("F0001", "101", "Eva Martinez",   "Backup"),
+        ("F0002", "101", "Frank Wilson",   "Backup"),
+    ]
+
+    for emp in employees_101 + employees_102 + backups:
         cursor.execute(
             "INSERT OR IGNORE INTO Employees (employee_id, branch_id, name, role) "
             "VALUES (?, ?, ?, ?)",
@@ -214,7 +215,13 @@ def add_employee(branch_id: str, name: str, role: str) -> str:
     """Insert a new employee into the Employees table.
 
     Generates a unique employee_id using uuid4 and returns it.
+    Rejects the creation of Manager roles (read-only seed only).
+
+    Raises ValueError if the role is Manager.
     """
+    if role.upper() == "MANAGER":
+        raise ValueError("Manager role is read-only and cannot be created.")
+
     employee_id = uuid.uuid4().hex[:6].upper()
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
@@ -232,9 +239,21 @@ def remove_employee(employee_id: str) -> bool:
     """Delete an employee by their employee_id.
 
     Returns True if a row was deleted, False otherwise.
+    Managers are protected and cannot be removed.
     """
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
+
+    # Check if the employee is a Manager — abort if so
+    cursor.execute(
+        "SELECT role FROM Employees WHERE employee_id = ?",
+        (employee_id,),
+    )
+    row = cursor.fetchone()
+    if row and row[0] == "Manager":
+        conn.close()
+        return False
+
     cursor.execute(
         "DELETE FROM Employees WHERE employee_id = ?",
         (employee_id,),
