@@ -14,7 +14,7 @@
         extend: {
           fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
           colors: {
-            surface: { 800: '#1a1d23', 700: '#22262e', 600: '#2a2f38' },
+            surface: { 900: '#13151a', 800: '#1a1d23', 700: '#22262e', 600: '#2a2f38' },
             accent: { 400: '#60a5fa', 500: '#3b82f6', 600: '#2563eb' },
           },
         },
@@ -23,13 +23,14 @@
   </script>
   <style>
     body { font-family: 'Inter', system-ui, sans-serif; }
-    /* Subtle pulse for the live indicator dot */
+
+    /* ── Animations ────────────────────────────────────────── */
     @keyframes livePulse {
       0%, 100% { opacity: 1; transform: scale(1); }
       50% { opacity: .5; transform: scale(1.4); }
     }
     .live-dot { animation: livePulse 1.6s ease-in-out infinite; }
-    /* Smooth shimmer on clock digits */
+
     @keyframes shimmer {
       0% { background-position: -200% center; }
       100% { background-position: 200% center; }
@@ -41,101 +42,458 @@
       -webkit-text-fill-color: transparent;
       animation: shimmer 3s linear infinite;
     }
-    /* Card border glow for warnings */
+
     @keyframes warningPulse {
       0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,.25); }
       50% { box-shadow: 0 0 20px 4px rgba(239,68,68,.35); }
     }
     .warning-card { animation: warningPulse 2s ease-in-out infinite; }
-    /* Fade-in for cards */
+
     @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
     .fade-up { animation: fadeUp .4s ease-out both; }
+
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .fade-in { animation: fadeIn .5s ease-out both; }
+
+    @keyframes slideDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+    .slide-down { animation: slideDown .4s ease-out both; }
+
+    /* Login bg grid effect */
+    .login-grid {
+      background-image:
+        linear-gradient(rgba(59,130,246,.06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(59,130,246,.06) 1px, transparent 1px);
+      background-size: 60px 60px;
+    }
+
+    /* Custom scrollbar */
+    .staff-scroll::-webkit-scrollbar { width: 6px; }
+    .staff-scroll::-webkit-scrollbar-track { background: transparent; }
+    .staff-scroll::-webkit-scrollbar-thumb { background: #3b4252; border-radius: 3px; }
+    .staff-scroll::-webkit-scrollbar-thumb:hover { background: #4c566a; }
+
+    .row-hover { transition: background-color .15s ease, transform .15s ease; }
+    .row-hover:hover { background-color: rgba(255,255,255,.04); }
+
+    /* Tab underline animation */
+    .tab-btn { position: relative; }
+    .tab-btn::after {
+      content: '';
+      position: absolute;
+      bottom: -1px; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+      border-radius: 1px;
+      transform: scaleX(0);
+      transition: transform .25s ease;
+    }
+    .tab-btn.active::after { transform: scaleX(1); }
+
+    /* Login transition */
+    .login-exit {
+      animation: loginExit .6s ease-in forwards;
+    }
+    @keyframes loginExit {
+      0%   { opacity: 1; transform: scale(1); }
+      100% { opacity: 0; transform: scale(1.02); pointer-events: none; }
+    }
   </style>
 </head>
 
-<body class="bg-surface-800 text-gray-200 min-h-screen antialiased">
+<body class="bg-surface-800 text-gray-200 min-h-screen antialiased overflow-x-hidden">
 
-  <!-- ===== Top Navigation Bar ===== -->
-  <nav class="sticky top-0 z-50 bg-surface-700/80 backdrop-blur-md border-b border-white/5">
-    <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <!-- Bank icon -->
-        <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-accent-500 to-indigo-500 flex items-center justify-center shadow-lg shadow-accent-500/20">
-          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+  <!-- ================================================================
+       LOGIN OVERLAY
+       ================================================================ -->
+  <div id="login-screen" class="fixed inset-0 z-[100] bg-surface-900 login-grid flex items-center justify-center">
+    <div class="w-full max-w-sm px-6">
+
+      <!-- Logo + Branding -->
+      <div class="text-center mb-10 slide-down">
+        <div class="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-accent-500 to-indigo-500 flex items-center justify-center shadow-2xl shadow-accent-500/25 mb-5">
+          <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 14v4M12 14v4M16 14v4"/>
           </svg>
         </div>
-        <h1 class="text-lg font-bold tracking-tight text-white">Bank HQ <span class="text-accent-400 font-medium">Dashboard</span></h1>
+        <h1 class="text-2xl font-bold text-white mb-1">Bank HQ</h1>
+        <p class="text-sm text-gray-500">Distributed Management System</p>
       </div>
-      <!-- Live indicator -->
-      <div id="connection-status" class="flex items-center gap-2 text-xs font-medium text-emerald-400">
-        <span class="live-dot inline-block w-2 h-2 rounded-full bg-emerald-400"></span>
-        LIVE
+
+      <!-- Login Form Card -->
+      <div class="bg-surface-800 rounded-2xl p-8 border border-white/5 shadow-2xl slide-down" style="animation-delay: .1s">
+        <h2 class="text-sm font-semibold uppercase tracking-widest text-gray-500 mb-6">Sign in to Dashboard</h2>
+
+        <form id="login-form" autocomplete="off" class="space-y-4">
+          <div>
+            <label for="login-user" class="block text-xs font-medium text-gray-400 mb-1.5">Username</label>
+            <input id="login-user" type="text" required placeholder="Enter username" autofocus
+              class="w-full bg-surface-700 border border-white/10 rounded-lg px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-accent-500/50 focus:border-accent-500 transition" />
+          </div>
+          <div>
+            <label for="login-pass" class="block text-xs font-medium text-gray-400 mb-1.5">Password</label>
+            <input id="login-pass" type="password" required placeholder="Enter password"
+              class="w-full bg-surface-700 border border-white/10 rounded-lg px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-accent-500/50 focus:border-accent-500 transition" />
+          </div>
+
+          <p id="login-error" class="text-xs text-red-400 text-center h-4"></p>
+
+          <button id="login-btn" type="submit"
+            class="w-full bg-gradient-to-r from-accent-500 to-indigo-500 hover:from-accent-400 hover:to-indigo-400 text-white text-sm font-semibold py-3 rounded-lg shadow-lg shadow-accent-500/20 transition-all duration-200 active:scale-[0.98]">
+            Sign In
+          </button>
+        </form>
       </div>
+
+      <p class="text-center text-[11px] text-gray-600 mt-6 slide-down" style="animation-delay: .2s">
+        Authorized personnel only &middot; All activity is logged
+      </p>
     </div>
-  </nav>
+  </div>
 
-  <main class="max-w-7xl mx-auto px-6 py-10 space-y-10">
+  <!-- ================================================================
+       MAIN APPLICATION (hidden until login)
+       ================================================================ -->
+  <div id="app" class="hidden">
 
-    <!-- ===== Global System Clock ===== -->
-    <section id="clock-section" class="text-center space-y-2">
-      <p class="text-xs font-semibold uppercase tracking-widest text-gray-500">Global System Clock (Lamport)</p>
-      <p id="hq-clock" class="text-7xl font-extrabold clock-shimmer tabular-nums">--</p>
-      <p id="last-update" class="text-xs text-gray-600">Waiting for data…</p>
-    </section>
+    <!-- ===== Top Navigation Bar with Tabs ===== -->
+    <nav class="sticky top-0 z-50 bg-surface-700/80 backdrop-blur-md border-b border-white/5">
+      <div class="max-w-7xl mx-auto px-6">
+        <!-- Top row: Brand + Live indicator -->
+        <div class="flex items-center justify-between py-3.5">
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-accent-500 to-indigo-500 flex items-center justify-center shadow-lg shadow-accent-500/20">
+              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 14v4M12 14v4M16 14v4"/>
+              </svg>
+            </div>
+            <h1 class="text-lg font-bold tracking-tight text-white">Bank HQ <span class="text-accent-400 font-medium">Dashboard</span></h1>
+          </div>
 
-    <!-- ===== Summary Stats Bar ===== -->
-    <section class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-      <div class="bg-surface-700 rounded-xl p-5 border border-white/5">
-        <p class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">Total Branches</p>
-        <p id="stat-branches" class="text-2xl font-bold text-white">--</p>
+          <div class="flex items-center gap-5">
+            <div id="connection-status" class="flex items-center gap-2 text-xs font-medium text-emerald-400">
+              <span class="live-dot inline-block w-2 h-2 rounded-full bg-emerald-400"></span>
+              LIVE
+            </div>
+            <button id="logout-btn" title="Sign out"
+              class="p-2 rounded-lg hover:bg-white/5 text-gray-500 hover:text-gray-300 transition-colors">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Tab bar -->
+        <div class="flex gap-1 -mb-px">
+          <button class="tab-btn active px-5 py-2.5 text-sm font-medium text-white transition-colors rounded-t-lg hover:bg-white/5"
+                  data-tab="network" id="tab-network">
+            <span class="flex items-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+              </svg>
+              Network & Liquidity
+            </span>
+          </button>
+          <button class="tab-btn px-5 py-2.5 text-sm font-medium text-gray-500 transition-colors rounded-t-lg hover:bg-white/5 hover:text-gray-300"
+                  data-tab="workforce" id="tab-workforce">
+            <span class="flex items-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87M16 3.13a4 4 0 010 7.75M12 14a4 4 0 100-8 4 4 0 000 8z"/>
+              </svg>
+              Workforce & HR
+            </span>
+          </button>
+        </div>
       </div>
-      <div class="bg-surface-700 rounded-xl p-5 border border-white/5">
-        <p class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">Network Liquidity</p>
-        <p id="stat-liquidity" class="text-2xl font-bold text-emerald-400">--</p>
-      </div>
-      <div class="bg-surface-700 rounded-xl p-5 border border-white/5">
-        <p class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">Active Warnings</p>
-        <p id="stat-warnings" class="text-2xl font-bold text-red-400">--</p>
-      </div>
-    </section>
+    </nav>
 
-    <!-- ===== Branch Grid ===== -->
-    <section>
-      <h2 class="text-sm font-semibold uppercase tracking-widest text-gray-500 mb-4">Branch Network</h2>
-      <div id="branch-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-        <!-- Cards injected dynamically by JS -->
-        <p id="branch-placeholder" class="col-span-full text-center text-gray-600 py-16">Loading branch data…</p>
-      </div>
-    </section>
+    <!-- ============================================================
+         VIEW 1 — NETWORK & LIQUIDITY
+         ============================================================ -->
+    <div id="view-network" class="fade-in">
+      <main class="max-w-7xl mx-auto px-6 py-10 space-y-10">
 
-  </main>
+        <!-- Global System Clock -->
+        <section id="clock-section" class="text-center space-y-2">
+          <p class="text-xs font-semibold uppercase tracking-widest text-gray-500">Global System Clock (Lamport)</p>
+          <p id="hq-clock" class="text-7xl font-extrabold clock-shimmer tabular-nums">--</p>
+          <p id="last-update" class="text-xs text-gray-600">Waiting for data…</p>
+        </section>
 
-  <!-- ===== Footer ===== -->
-  <footer class="max-w-7xl mx-auto px-6 py-8 text-center text-xs text-gray-600 border-t border-white/5">
-    Distributed Bank Management System &middot; Polling every 2 s
-  </footer>
+        <!-- Summary Stats Bar -->
+        <section class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div class="bg-surface-700 rounded-xl p-5 border border-white/5">
+            <p class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">Total Branches</p>
+            <p id="stat-branches" class="text-2xl font-bold text-white">--</p>
+          </div>
+          <div class="bg-surface-700 rounded-xl p-5 border border-white/5">
+            <p class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">Network Liquidity</p>
+            <p id="stat-liquidity" class="text-2xl font-bold text-emerald-400">--</p>
+          </div>
+          <div class="bg-surface-700 rounded-xl p-5 border border-white/5">
+            <p class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">Active Warnings</p>
+            <p id="stat-warnings" class="text-2xl font-bold text-red-400">--</p>
+          </div>
+        </section>
 
-  <!-- ===== JavaScript: Polling & Rendering ===== -->
+        <!-- Branch Grid -->
+        <section>
+          <h2 class="text-sm font-semibold uppercase tracking-widest text-gray-500 mb-4">Branch Network</h2>
+          <div id="branch-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            <p id="branch-placeholder" class="col-span-full text-center text-gray-600 py-16">Loading branch data…</p>
+          </div>
+        </section>
+
+      </main>
+    </div>
+
+    <!-- ============================================================
+         VIEW 2 — WORKFORCE & HR
+         ============================================================ -->
+    <div id="view-workforce" class="hidden fade-in">
+      <main class="max-w-7xl mx-auto px-6 py-10 space-y-10">
+
+        <!-- HR Control Panel -->
+        <section>
+          <div class="flex items-center gap-3 mb-5">
+            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center shadow-lg shadow-violet-500/20">
+              <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87M16 3.13a4 4 0 010 7.75M12 14a4 4 0 100-8 4 4 0 000 8z"/>
+              </svg>
+            </div>
+            <h2 class="text-sm font-semibold uppercase tracking-widest text-gray-500">HR Control Panel</h2>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+            <!-- Left Column — Hire Staff -->
+            <div class="bg-surface-700 rounded-2xl p-6 border border-white/5">
+              <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-4 flex items-center gap-2">
+                <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                Hire Staff
+              </h3>
+              <form id="hire-form" class="space-y-4" autocomplete="off">
+                <div>
+                  <label for="hire-name" class="block text-xs font-medium text-gray-400 mb-1.5">Full Name</label>
+                  <input id="hire-name" type="text" required placeholder="e.g. Jane Doe"
+                    class="w-full bg-surface-600 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-accent-500/50 focus:border-accent-500 transition" />
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                    <label for="hire-branch" class="block text-xs font-medium text-gray-400 mb-1.5">Branch</label>
+                    <select id="hire-branch" required
+                      class="w-full bg-surface-600 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-accent-500/50 focus:border-accent-500 transition appearance-none">
+                      <option value="101">101 — HQ Local</option>
+                      <option value="102">102 — Downtown</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label for="hire-role" class="block text-xs font-medium text-gray-400 mb-1.5">Role</label>
+                    <select id="hire-role" required
+                      class="w-full bg-surface-600 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-accent-500/50 focus:border-accent-500 transition appearance-none">
+                      <option value="Manager">Manager</option>
+                      <option value="Teller">Teller</option>
+                      <option value="Security">Security</option>
+                    </select>
+                  </div>
+                </div>
+                <button id="hire-btn" type="submit"
+                  class="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white text-sm font-semibold py-2.5 rounded-lg shadow-lg shadow-emerald-500/20 transition-all duration-200 active:scale-[0.98]">
+                  Hire Employee
+                </button>
+                <p id="hire-feedback" class="text-xs text-center h-4"></p>
+              </form>
+            </div>
+
+            <!-- Right Column — Active Staff -->
+            <div class="bg-surface-700 rounded-2xl p-6 border border-white/5 flex flex-col">
+              <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-4 flex items-center gap-2">
+                <svg class="w-4 h-4 text-accent-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m10-7.13a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                Active Staff
+                <span id="staff-count" class="ml-auto text-gray-500 font-normal">—</span>
+              </h3>
+              <div class="flex-1 overflow-y-auto max-h-72 staff-scroll rounded-lg">
+                <table class="w-full text-sm">
+                  <thead class="sticky top-0 bg-surface-700 z-10">
+                    <tr class="text-[10px] uppercase tracking-wider text-gray-500 border-b border-white/5">
+                      <th class="text-left py-2 pl-3 font-semibold">ID</th>
+                      <th class="text-left py-2 font-semibold">Name</th>
+                      <th class="text-left py-2 font-semibold">Branch</th>
+                      <th class="text-left py-2 font-semibold">Role</th>
+                      <th class="text-right py-2 pr-3 font-semibold"></th>
+                    </tr>
+                  </thead>
+                  <tbody id="staff-table-body">
+                    <tr><td colspan="5" class="text-center text-gray-600 py-8">Loading employees…</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- Dynamic Workforce Schedule -->
+        <section>
+          <div class="flex items-center gap-3 mb-5">
+            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-lg shadow-amber-500/20">
+              <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+              </svg>
+            </div>
+            <h2 class="text-sm font-semibold uppercase tracking-widest text-gray-500">Live Weekly Schedule</h2>
+            <div class="ml-auto flex items-center gap-4 text-[10px] font-medium uppercase tracking-wider">
+              <span class="flex items-center gap-1.5"><span class="inline-block w-2.5 h-2.5 rounded-sm bg-sky-500/30 border border-sky-400/40"></span><span class="text-sky-400">Floating Teller</span></span>
+              <span class="flex items-center gap-1.5"><span class="inline-block w-2.5 h-2.5 rounded-sm bg-red-500/30 border border-red-400/40"></span><span class="text-red-400">Unassigned</span></span>
+            </div>
+          </div>
+
+          <div id="schedule-container" class="space-y-6">
+            <p id="schedule-placeholder" class="text-center text-gray-600 py-16">Loading schedule…</p>
+          </div>
+        </section>
+
+      </main>
+    </div>
+
+    <!-- Footer -->
+    <footer class="max-w-7xl mx-auto px-6 py-8 text-center text-xs text-gray-600 border-t border-white/5">
+      Distributed Bank Management System &middot; Polling every 2 s
+    </footer>
+
+  </div><!-- /app -->
+
+
+  <!-- ================================================================
+       JAVASCRIPT — Login, Tabs, Polling & Rendering
+       ================================================================ -->
   <script>
-    const API_URL = 'http://localhost:8000/status';
-    const POLL_INTERVAL = 2000; // 2 seconds
+    /* ──────────────────────────────────────────────────────────────
+       Configuration
+       ────────────────────────────────────────────────────────────── */
+    const BASE_URL      = 'http://localhost:8000';
+    const STATUS_URL    = `${BASE_URL}/status`;
+    const EMPLOYEES_URL = `${BASE_URL}/employees`;
+    const EMPLOYEE_URL  = `${BASE_URL}/employee`;
+    const SCHEDULE_URL  = `${BASE_URL}/schedule`;
+    const POLL_INTERVAL = 2000;
+    const WEEKDAYS      = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
-    /**
-     * Format a number as USD currency string, e.g. 24055.01 → "$24,055.01"
-     */
+    /* ──────────────────────────────────────────────────────────────
+       State
+       ────────────────────────────────────────────────────────────── */
+    let isLoggedIn  = false;
+    let activeTab   = 'network';   // 'network' | 'workforce'
+    let pollTimerId = null;
+
+    /* ──────────────────────────────────────────────────────────────
+       LOGIN
+       ────────────────────────────────────────────────────────────── */
+    document.getElementById('login-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      const user = document.getElementById('login-user').value.trim();
+      const pass = document.getElementById('login-pass').value;
+      const errEl = document.getElementById('login-error');
+
+      if (user === 'admin' && pass === 'admin') {
+        // Success — fade out login, reveal app
+        errEl.textContent = '';
+        isLoggedIn = true;
+
+        const loginScreen = document.getElementById('login-screen');
+        loginScreen.classList.add('login-exit');
+
+        loginScreen.addEventListener('animationend', () => {
+          loginScreen.classList.add('hidden');
+          const app = document.getElementById('app');
+          app.classList.remove('hidden');
+          app.classList.add('fade-in');
+
+          // Start polling now that user is authenticated
+          startPolling();
+        }, { once: true });
+      } else {
+        // Failure
+        errEl.textContent = 'Invalid credentials. Please try again.';
+        document.getElementById('login-pass').value = '';
+        document.getElementById('login-pass').focus();
+
+        // Shake the form card
+        const card = document.getElementById('login-form').closest('.bg-surface-800');
+        card.style.animation = 'none';
+        card.offsetHeight; // trigger reflow
+        card.style.animation = 'shake .4s ease';
+      }
+    });
+
+    /* Logout */
+    document.getElementById('logout-btn').addEventListener('click', function () {
+      isLoggedIn = false;
+      if (pollTimerId) { clearInterval(pollTimerId); pollTimerId = null; }
+
+      document.getElementById('app').classList.add('hidden');
+      document.getElementById('app').classList.remove('fade-in');
+
+      const loginScreen = document.getElementById('login-screen');
+      loginScreen.classList.remove('hidden', 'login-exit');
+
+      document.getElementById('login-user').value = '';
+      document.getElementById('login-pass').value = '';
+      document.getElementById('login-error').textContent = '';
+      document.getElementById('login-user').focus();
+    });
+
+    /* ──────────────────────────────────────────────────────────────
+       TAB SWITCHING
+       ────────────────────────────────────────────────────────────── */
+    const tabButtons = document.querySelectorAll('.tab-btn');
+    const viewNetwork   = document.getElementById('view-network');
+    const viewWorkforce = document.getElementById('view-workforce');
+
+    tabButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tab = btn.dataset.tab;
+        if (tab === activeTab) return;
+        activeTab = tab;
+
+        // Update button states
+        tabButtons.forEach(b => {
+          b.classList.remove('active', 'text-white');
+          b.classList.add('text-gray-500');
+        });
+        btn.classList.add('active', 'text-white');
+        btn.classList.remove('text-gray-500');
+
+        // Toggle views
+        if (tab === 'network') {
+          viewWorkforce.classList.add('hidden');
+          viewNetwork.classList.remove('hidden');
+          // Re-trigger fade animation
+          viewNetwork.style.animation = 'none';
+          viewNetwork.offsetHeight;
+          viewNetwork.style.animation = '';
+        } else {
+          viewNetwork.classList.add('hidden');
+          viewWorkforce.classList.remove('hidden');
+          viewWorkforce.style.animation = 'none';
+          viewWorkforce.offsetHeight;
+          viewWorkforce.style.animation = '';
+        }
+      });
+    });
+
+    /* ──────────────────────────────────────────────────────────────
+       UTILITY
+       ────────────────────────────────────────────────────────────── */
     function formatCurrency(value) {
       return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
     }
 
-    /**
-     * Build the HTML for a single branch card.
-     * If the balance is below the threshold the card turns red with a warning badge.
-     */
+    /* ──────────────────────────────────────────────────────────────
+       BRANCH CARDS
+       ────────────────────────────────────────────────────────────── */
     function buildCard(branch, index) {
       const isWarning = branch.current_balance < branch.minimum_threshold;
-
-      // Pick colours based on liquidity status
       const border  = isWarning ? 'border-red-500/40' : 'border-white/5';
       const bg      = isWarning ? 'bg-red-950/30'     : 'bg-surface-700';
       const glow    = isWarning ? 'warning-card'       : '';
@@ -149,10 +507,8 @@
               <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
               Liquidity Warning
             </div>` : ''}
-
           <p class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">Branch</p>
           <p class="text-3xl font-extrabold text-white mb-4">${branch.branch_id}</p>
-
           <div class="space-y-3">
             <div>
               <p class="text-[11px] font-medium uppercase tracking-wider text-gray-500">Current Balance</p>
@@ -163,8 +519,6 @@
               <p class="text-sm font-semibold text-gray-400 tabular-nums">${formatCurrency(branch.minimum_threshold)}</p>
             </div>
           </div>
-
-          <!-- Health bar -->
           <div class="mt-5">
             <div class="w-full h-1.5 rounded-full bg-surface-600 overflow-hidden">
               <div class="h-full rounded-full transition-all duration-700 ${isWarning ? 'bg-red-500' : 'bg-emerald-500'}"
@@ -174,24 +528,236 @@
         </div>`;
     }
 
-    /**
-     * Fetch the latest status from the API and re-render the dashboard.
-     */
-    async function fetchAndRender() {
+    /* ──────────────────────────────────────────────────────────────
+       EMPLOYEE TABLE
+       ────────────────────────────────────────────────────────────── */
+    function renderEmployees(employees) {
+      const tbody = document.getElementById('staff-table-body');
+      const countEl = document.getElementById('staff-count');
+      countEl.textContent = `${employees.length} total`;
+
+      if (employees.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-gray-600 py-8">No employees found.</td></tr>';
+        return;
+      }
+
+      const roleBadge = (role) => {
+        const map = {
+          'Manager':  'bg-violet-500/20 text-violet-300 border-violet-500/30',
+          'Teller':   'bg-sky-500/20 text-sky-300 border-sky-500/30',
+          'Security': 'bg-amber-500/20 text-amber-300 border-amber-500/30',
+        };
+        return map[role] || 'bg-gray-500/20 text-gray-300 border-gray-500/30';
+      };
+
+      tbody.innerHTML = employees.map(emp => `
+        <tr class="row-hover border-b border-white/[.03]">
+          <td class="py-2.5 pl-3 text-xs font-mono text-gray-500">${emp.employee_id}</td>
+          <td class="py-2.5 font-medium text-white">${emp.name}</td>
+          <td class="py-2.5 text-gray-400">${emp.branch_id}</td>
+          <td class="py-2.5">
+            <span class="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full border ${roleBadge(emp.role)}">${emp.role}</span>
+          </td>
+          <td class="py-2.5 pr-3 text-right">
+            <button onclick="fireEmployee('${emp.employee_id}')" title="Remove employee"
+              class="group p-1.5 rounded-lg hover:bg-red-500/20 transition-colors duration-150">
+              <svg class="w-4 h-4 text-gray-500 group-hover:text-red-400 transition-colors" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+              </svg>
+            </button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    /* ──────────────────────────────────────────────────────────────
+       SCHEDULE GRID
+       ────────────────────────────────────────────────────────────── */
+    function renderSchedule(data) {
+      const container = document.getElementById('schedule-container');
+      const schedule = data.weekly_schedule;
+
+      if (!schedule || Object.keys(schedule).length === 0) {
+        container.innerHTML = '<p class="text-center text-gray-600 py-16">No schedule data available.</p>';
+        return;
+      }
+
+      let html = '';
+
+      for (const [branchLabel, info] of Object.entries(schedule)) {
+        const volBadge = info.high_volume_flag
+          ? '<span class="ml-2 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30">High Volume</span>'
+          : '';
+
+        html += `
+          <div class="bg-surface-700 rounded-2xl border border-white/5 overflow-hidden fade-up">
+            <div class="px-6 py-4 border-b border-white/5 flex items-center flex-wrap gap-2">
+              <h3 class="text-sm font-bold text-white">${branchLabel}</h3>
+              <span class="text-[10px] font-medium uppercase tracking-wider text-gray-500 px-2 py-0.5 rounded-full bg-surface-600">${info.branch_size}</span>
+              ${volBadge}
+              <span class="ml-auto text-xs text-gray-500 tabular-nums">${formatCurrency(info.current_balance)}</span>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="text-[10px] uppercase tracking-wider text-gray-500 border-b border-white/5">
+                    <th class="text-left py-2.5 pl-6 font-semibold w-24">Day</th>
+                    ${(() => {
+                      let maxShifts = 0;
+                      for (const day of WEEKDAYS) {
+                        const shifts = (info.days && info.days[day]) || [];
+                        if (shifts.length > maxShifts) maxShifts = shifts.length;
+                      }
+                      let ths = '';
+                      for (let i = 1; i <= maxShifts; i++) {
+                        ths += '<th class="text-left py-2.5 px-3 font-semibold">Shift ' + i + '</th>';
+                      }
+                      return ths;
+                    })()}
+                  </tr>
+                </thead>
+                <tbody>
+                  ${WEEKDAYS.map(day => {
+                    const shifts = (info.days && info.days[day]) || [];
+                    let maxShifts = 0;
+                    for (const d of WEEKDAYS) {
+                      const s = (info.days && info.days[d]) || [];
+                      if (s.length > maxShifts) maxShifts = s.length;
+                    }
+
+                    let cells = '';
+                    for (let i = 0; i < maxShifts; i++) {
+                      if (i < shifts.length) {
+                        const s = shifts[i];
+                        const isFloating = s.role === 'Floating Teller';
+                        const isUnassigned = s.assigned_to && s.assigned_to.includes('UNASSIGNED');
+
+                        let cellBg = '';
+                        let textCol = 'text-gray-300';
+                        let roleCol = 'text-gray-500';
+                        if (isFloating) {
+                          cellBg = 'bg-sky-500/10 border border-sky-400/20 rounded-lg';
+                          textCol = 'text-sky-200';
+                          roleCol = 'text-sky-400';
+                        } else if (isUnassigned) {
+                          cellBg = 'bg-red-500/10 border border-red-400/20 rounded-lg';
+                          textCol = 'text-red-300';
+                          roleCol = 'text-red-400';
+                        }
+
+                        const displayName = isUnassigned ? 'UNASSIGNED' : s.assigned_to;
+
+                        cells += `
+                          <td class="py-2.5 px-3">
+                            <div class="px-2.5 py-1.5 ${cellBg}">
+                              <p class="font-medium ${textCol} text-xs">${displayName}</p>
+                              <p class="${roleCol} text-[10px] uppercase tracking-wider font-semibold">${s.role} · ${s.time}</p>
+                            </div>
+                          </td>`;
+                      } else {
+                        cells += '<td class="py-2.5 px-3"></td>';
+                      }
+                    }
+
+                    return `
+                      <tr class="row-hover border-b border-white/[.03]">
+                        <td class="py-2.5 pl-6 font-semibold text-white text-xs">${day.slice(0, 3)}</td>
+                        ${cells}
+                      </tr>`;
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>`;
+      }
+
+      container.innerHTML = html;
+    }
+
+    /* ──────────────────────────────────────────────────────────────
+       ASYNC API CALLS
+       ────────────────────────────────────────────────────────────── */
+    async function fetchEmployees() {
       try {
-        const res = await fetch(API_URL);
+        const res = await fetch(EMPLOYEES_URL);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const employees = await res.json();
+        renderEmployees(employees);
+      } catch (err) {
+        console.error('Employee fetch error:', err);
+      }
+    }
+
+    async function fetchSchedule() {
+      try {
+        const res = await fetch(SCHEDULE_URL);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        renderSchedule(data);
+      } catch (err) {
+        console.error('Schedule fetch error:', err);
+      }
+    }
+
+    async function hireEmployee(e) {
+      e.preventDefault();
+      const btn = document.getElementById('hire-btn');
+      const feedback = document.getElementById('hire-feedback');
+      btn.disabled = true;
+      btn.textContent = 'Hiring…';
+
+      try {
+        const payload = {
+          branch_id: document.getElementById('hire-branch').value,
+          name: document.getElementById('hire-name').value.trim(),
+          role: document.getElementById('hire-role').value,
+        };
+        const res = await fetch(EMPLOYEE_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
 
-        // --- Update Lamport clock ---
+        feedback.textContent = `✓ ${data.message}`;
+        feedback.className = 'text-xs text-center h-4 text-emerald-400';
+        document.getElementById('hire-form').reset();
+
+        await Promise.all([fetchEmployees(), fetchSchedule()]);
+      } catch (err) {
+        console.error('Hire error:', err);
+        feedback.textContent = '✗ Failed to hire employee.';
+        feedback.className = 'text-xs text-center h-4 text-red-400';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Hire Employee';
+        setTimeout(() => { feedback.textContent = ''; }, 3000);
+      }
+    }
+
+    async function fireEmployee(employeeId) {
+      try {
+        const res = await fetch(`${EMPLOYEE_URL}/${employeeId}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        await Promise.all([fetchEmployees(), fetchSchedule()]);
+      } catch (err) {
+        console.error('Fire error:', err);
+      }
+    }
+
+    async function fetchStatus() {
+      try {
+        const res = await fetch(STATUS_URL);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
         document.getElementById('hq-clock').textContent = data.hq_clock;
 
-        // --- Update timestamp ---
         const now = new Date();
         document.getElementById('last-update').textContent =
           `Last updated ${now.toLocaleTimeString()}`;
 
-        // --- Summary stats ---
         const branches = data.network_status || [];
         const totalLiquidity = branches.reduce((s, b) => s + b.current_balance, 0);
         const warningCount = branches.filter(b => b.current_balance < b.minimum_threshold).length;
@@ -205,11 +771,9 @@
           ? 'text-2xl font-bold text-red-400'
           : 'text-2xl font-bold text-emerald-400';
 
-        // --- Build branch cards ---
         const grid = document.getElementById('branch-grid');
         grid.innerHTML = branches.map((b, i) => buildCard(b, i)).join('');
 
-        // --- Connection indicator ---
         const status = document.getElementById('connection-status');
         status.innerHTML = '<span class="live-dot inline-block w-2 h-2 rounded-full bg-emerald-400"></span> LIVE';
         status.className = 'flex items-center gap-2 text-xs font-medium text-emerald-400';
@@ -222,9 +786,33 @@
       }
     }
 
-    // Initial fetch + start polling every 2 seconds
-    fetchAndRender();
-    setInterval(fetchAndRender, POLL_INTERVAL);
+    /* ──────────────────────────────────────────────────────────────
+       POLLING — runs regardless of active tab
+       ────────────────────────────────────────────────────────────── */
+    async function pollAll() {
+      await Promise.allSettled([fetchStatus(), fetchEmployees(), fetchSchedule()]);
+    }
+
+    function startPolling() {
+      pollAll();  // immediate first fetch
+      pollTimerId = setInterval(pollAll, POLL_INTERVAL);
+    }
+
+    /* ──────────────────────────────────────────────────────────────
+       WIRE UP EVENTS
+       ────────────────────────────────────────────────────────────── */
+    document.getElementById('hire-form').addEventListener('submit', hireEmployee);
   </script>
+
+  <!-- Shake animation for failed login -->
+  <style>
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20% { transform: translateX(-8px); }
+      40% { transform: translateX(8px); }
+      60% { transform: translateX(-6px); }
+      80% { transform: translateX(6px); }
+    }
+  </style>
 </body>
 </html>
