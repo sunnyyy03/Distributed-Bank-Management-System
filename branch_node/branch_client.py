@@ -28,7 +28,7 @@ TRANSFER_QUEUE = "transfer_requests"
 
 # Shared mutable state guarded by a lock
 _state_lock = threading.Lock()
-current_cash = 0.0  # latest known cash balance (updated by the publish loop)
+current_cash = 10000.0  # latest known cash balance
 
 
 def connect_to_rabbitmq():
@@ -157,6 +157,32 @@ def _on_coordinator_message(ch, method, properties, body):
             f"transfer discarded  (tx={short_tx}...)"
         )
 
+    # ----------------------------------------------------------
+    # SYNC — hard reset of local state
+    # ----------------------------------------------------------
+    elif msg_type == "SYNC":
+        with _state_lock:
+            current_cash = amount
+            print(
+                f"Branch {BRANCH_ID} Chaos: SYNC received — "
+                f"forced balance reset to ${current_cash}"
+            )
+
+    # ----------------------------------------------------------
+    # LOCAL_TX — apply a local deposit or withdrawal
+    # ----------------------------------------------------------
+    elif msg_type == "LOCAL_TX":
+        tx_type = data.get("tx_type")
+        with _state_lock:
+            if tx_type == "DEPOSIT":
+                current_cash += amount
+            elif tx_type == "WITHDRAWAL":
+                current_cash -= amount
+            print(
+                f"Branch {BRANCH_ID} Chaos: LOCAL_TX ({tx_type}) received — "
+                f"applied ${amount}, new balance ${current_cash}"
+            )
+
     ch.basic_ack(delivery_tag=method.delivery_tag)
 
 
@@ -179,90 +205,24 @@ def _coordinator_listener():
 # =================================================================
 
 def run_branch():
-    """Run the branch publish loop indefinitely.
+    """Run the branch purely as a listener.
 
-    On each iteration the branch:
-    1. Increments its local Lamport clock (a local event occurred).
-    2. Generates a random cash balance to simulate transactions.
-    3. Publishes the update to the ``branch_updates`` RabbitMQ queue.
-
-    Every ~15 seconds (every 3rd iteration), Branch 101 also publishes
-    a TransferRequest to simulate a live inter-branch transfer.
+    The branch spins up a background thread to listen on its coordinator
+    queue for instructions (PREPARE, COMMIT, ABORT, SYNC, LOCAL_TX), and
+    blocks the main thread indefinitely.
     """
     global current_cash
 
-    print(f"Starting Branch {BRANCH_ID} Node...")
+    print(f"Starting Branch {BRANCH_ID} Node (Chaos Listener Mode)...")
 
     # Start the 2PC coordinator listener in a background thread
     threading.Thread(target=_coordinator_listener, daemon=True).start()
 
-    connection = connect_to_rabbitmq()
-    channel = connection.channel()
-    channel.queue_declare(queue=QUEUE_NAME)
-    channel.queue_declare(queue=TRANSFER_QUEUE)
-
-    # Initialize Branch Lamport Clock
-    lamport_clock = 0
-    iteration = 0
-
-    while True:
-        # A local event occurred (cash changed) — increment clock
-        lamport_clock += 1
-        iteration += 1
-
-        with _state_lock:
-            current_cash = round(random.uniform(5000, 50000), 2)
-            local_cash = current_cash
-
-        payload = {
-            "branch_id": BRANCH_ID,
-            "cash_amount": local_cash,
-            "lamport_clock": lamport_clock,
-        }
-
-        try:
-            channel.basic_publish(
-                exchange="",
-                routing_key=QUEUE_NAME,
-                body=json.dumps(payload),
-            )
-            print(
-                f"Branch {BRANCH_ID} (Clock: {lamport_clock}) published update: "
-                f"${local_cash}"
-            )
-        except pika.exceptions.AMQPError as e:
-            print(f"Branch {BRANCH_ID} publish error: {e}. Reconnecting...")
-            connection = connect_to_rabbitmq()
-            channel = connection.channel()
-            channel.queue_declare(queue=QUEUE_NAME)
-            channel.queue_declare(queue=TRANSFER_QUEUE)
-
-        # ---------------------------------------------------------
-        # Transfer trigger: Branch 101 requests a transfer every
-        # ~15 seconds (every 3rd loop iteration at 5s intervals).
-        # ---------------------------------------------------------
-        if str(BRANCH_ID) == "101" and iteration % 3 == 0:
-            transfer_amount = 5000.0
-            transfer_payload = {
-                "sender_id": "101",
-                "receiver_id": "102",
-                "amount": transfer_amount,
-            }
-            try:
-                channel.basic_publish(
-                    exchange="",
-                    routing_key=TRANSFER_QUEUE,
-                    body=json.dumps(transfer_payload),
-                )
-                print(
-                    f"Branch {BRANCH_ID}: Requesting transfer: "
-                    f"${transfer_amount} → Branch 102"
-                )
-            except pika.exceptions.AMQPError as e:
-                print(f"Branch {BRANCH_ID} transfer publish error: {e}")
-
-        # Wait 5 seconds before publishing again
-        time.sleep(5)
+    # Block main thread indefinitely
+    try:
+        threading.Event().wait()
+    except KeyboardInterrupt:
+        print(f"Branch {BRANCH_ID} shutting down.")
 
 
 if __name__ == "__main__":

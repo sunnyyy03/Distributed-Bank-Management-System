@@ -238,8 +238,13 @@
 
         <!-- Branch Grid -->
         <section>
-          <h2 class="text-sm font-semibold uppercase tracking-widest text-gray-500 mb-4">Branch Network</h2>
-          <div id="branch-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-sm font-semibold uppercase tracking-widest text-gray-500">Branch Network</h2>
+            <button onclick="executeReset()" class="text-xs font-semibold uppercase tracking-wider px-4 py-2 rounded-lg bg-surface-600 hover:bg-surface-500 text-white transition-all border border-white/5 shadow-lg shadow-black/20 hover:shadow-black/40 active:scale-[0.98]">
+              Reset Network
+            </button>
+          </div>
+          <div id="branch-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 items-start">
             <p id="branch-placeholder" class="col-span-full text-center text-gray-600 py-16">Loading branch data…</p>
           </div>
         </section>
@@ -512,18 +517,34 @@
        ────────────────────────────────────────────────────────────── */
     function buildCard(branch, index) {
       const isWarning = branch.current_balance < branch.minimum_threshold;
-      const border  = isWarning ? 'border-red-500/40' : 'border-white/5';
-      const bg      = isWarning ? 'bg-red-950/30'     : 'bg-surface-700';
-      const glow    = isWarning ? 'warning-card'       : '';
-      const balCol  = isWarning ? 'text-red-400'       : 'text-emerald-400';
+      const isHighVolume = branch.current_balance >= (branch.minimum_threshold * 2.5);
+      
+      let border = 'border-white/5';
+      let bg = 'bg-surface-700';
+      let glow = '';
+      let balCol = 'text-emerald-400';
+
+      if (isWarning) {
+        border = 'border-red-500/40';
+        bg = 'bg-red-950/30';
+        glow = 'warning-card';
+        balCol = 'text-red-400';
+      } else if (isHighVolume) {
+        border = 'border-blue-500/50';
+        bg = 'bg-blue-900/20';
+        balCol = 'text-blue-400';
+      }
 
       return `
-        <div class="fade-up ${bg} ${glow} rounded-2xl p-6 border ${border} transition-all duration-300 relative overflow-hidden"
+        <div class="fade-up ${bg} ${glow} rounded-2xl p-6 border ${border} transition-all duration-300 relative"
              style="animation-delay: ${index * 80}ms">
           ${isWarning ? `
             <div class="absolute top-3 right-3 flex items-center gap-1.5 bg-red-500/20 text-red-400 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border border-red-500/30">
               <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
               Liquidity Warning
+            </div>` : isHighVolume ? `
+            <div class="absolute top-3 right-3">
+              <span class="flex items-center gap-1 px-2 py-1 text-xs font-bold text-blue-400 bg-blue-900/30 border border-blue-500 rounded-md">⚡ HIGH VOLUME</span>
             </div>` : ''}
           <p class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">Branch</p>
           <p class="text-3xl font-extrabold text-white mb-4">${branch.branch_id}</p>
@@ -541,6 +562,22 @@
             <div class="w-full h-1.5 rounded-full bg-surface-600 overflow-hidden">
               <div class="h-full rounded-full transition-all duration-700 ${isWarning ? 'bg-red-500' : 'bg-emerald-500'}"
                    style="width: ${Math.min((branch.current_balance / (branch.minimum_threshold * 3)) * 100, 100)}%"></div>
+            </div>
+          </div>
+          <div class="mt-6 pt-5 border-t border-white/5 relative dropdown-container">
+            <button onclick="toggleDropdown('dropdown-${branch.branch_id}')" class="w-full bg-surface-600 hover:bg-surface-500 text-gray-300 font-medium py-2 px-3 rounded-lg border border-white/5 transition-all active:scale-[0.98] text-xs flex items-center justify-between group">
+              Manage ▾
+            </button>
+            <div id="dropdown-${branch.branch_id}" class="hidden w-full mt-2 bg-gray-800/50 border border-gray-700/50 rounded-md overflow-hidden flex flex-col">
+              <button onclick="executeLocalTx('${branch.branch_id}', 'DEPOSIT', 10000); toggleDropdown('dropdown-${branch.branch_id}')" class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-700 transition-colors text-emerald-400 font-medium">
+                Deposit $10,000
+              </button>
+              <button onclick="executeLocalTx('${branch.branch_id}', 'WITHDRAWAL', 10000); toggleDropdown('dropdown-${branch.branch_id}')" class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-700 transition-colors text-red-400 font-medium border-t border-white/[.02]">
+                Withdraw $10,000
+              </button>
+              <button onclick="executeWire('${branch.branch_id}', '${branch.branch_id === '101' ? '102' : '101'}', 10000); toggleDropdown('dropdown-${branch.branch_id}')" class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-700 transition-colors text-blue-400 font-medium border-t border-white/[.02]">
+                Transfer $10,000
+              </button>
             </div>
           </div>
         </div>`;
@@ -816,21 +853,65 @@
     }
 
     /* ──────────────────────────────────────────────────────────────
-       POLLING — runs regardless of active tab
+       POLLING & INIT
        ────────────────────────────────────────────────────────────── */
     async function pollAll() {
       await Promise.allSettled([fetchStatus(), fetchEmployees(), fetchSchedule()]);
     }
 
     function startPolling() {
+      // Automatic background updates disabled for Chaos mode. Data fetched purely on triggers.
       pollAll();  // immediate first fetch
-      pollTimerId = setInterval(pollAll, POLL_INTERVAL);
     }
 
     /* ──────────────────────────────────────────────────────────────
        WIRE UP EVENTS
        ────────────────────────────────────────────────────────────── */
     document.getElementById('hire-form').addEventListener('submit', hireEmployee);
+
+    // Reusable Action Functions
+    window.executeLocalTx = async function(branchId, type, amount) {
+      await executeAction(`${BASE_URL}/local-transaction`, { branch_id: branchId, type: type, amount: amount });
+    };
+
+    window.executeWire = async function(source, dest, amount) {
+      await executeAction(`${BASE_URL}/transfer`, { source_branch: source, dest_branch: dest, amount: amount });
+    };
+
+    window.executeReset = async function() {
+      await executeAction(`${BASE_URL}/reset`, {});
+    };
+
+    async function executeAction(url, payload) {
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        setTimeout(pollAll, 500);
+      } catch (err) {
+        console.error("Action error", err);
+      }
+    }
+
+    /* ──────────────────────────────────────────────────────────────
+       DROPDOWN MENU LOGIC
+       ────────────────────────────────────────────────────────────── */
+    window.toggleDropdown = function(id) {
+      const dropdown = document.getElementById(id);
+      if (dropdown) dropdown.classList.toggle('hidden');
+    };
+
+    window.addEventListener('click', function(e) {
+      // Close all dropdowns if click is outside of dropdowns AND their triggers
+      if (!e.target.closest('.dropdown-container')) {
+        const dropdowns = document.querySelectorAll('[id^="dropdown-"]');
+        dropdowns.forEach(d => d.classList.add('hidden'));
+      }
+    });
+
   </script>
 
   <!-- Shake animation for failed login -->

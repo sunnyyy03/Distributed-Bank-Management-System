@@ -65,6 +65,16 @@ class EmployeeCreate(BaseModel):
     name: str
     role: str
 
+class TransferRequest(BaseModel):
+    source_branch: str
+    dest_branch: str
+    amount: float
+
+class LocalTransactionRequest(BaseModel):
+    branch_id: str
+    type: str
+    amount: float
+
 
 # =================================================================
 # RabbitMQ Connection Helper
@@ -363,6 +373,87 @@ def get_status():
 def get_schedule():
     """Return the dynamically generated weekly shift schedule."""
     return scheduler.generate_weekly_schedule()
+
+
+# =================================================================
+# Chaos Controller Endpoints
+# =================================================================
+
+@app.post("/transfer")
+def trigger_transfer(payload: TransferRequest):
+    """Trigger a 2PC transfer by pushing to the transfer_requests queue."""
+    pub_conn = connect_to_rabbitmq()
+    pub_channel = pub_conn.channel()
+    
+    msg_payload = json.dumps({
+        "sender_id": payload.source_branch,
+        "receiver_id": payload.dest_branch,
+        "amount": payload.amount
+    })
+    
+    pub_channel.queue_declare(queue=TRANSFER_QUEUE)
+    pub_channel.basic_publish(
+        exchange="",
+        routing_key=TRANSFER_QUEUE,
+        body=msg_payload,
+    )
+    pub_conn.close()
+    return {"message": "Transfer initiated via 2PC"}
+
+
+@app.post("/local-transaction")
+def trigger_local_tx(payload: LocalTransactionRequest):
+    """Execute a local deposit or withdrawal."""
+    status = database.get_all_cash_status()
+    branch_info = next((b for b in status if b["branch_id"] == payload.branch_id), None)
+    if not branch_info:
+        raise HTTPException(status_code=404, detail="Branch not found")
+        
+    current_cash = branch_info["current_balance"]
+    if payload.type == "DEPOSIT":
+        new_cash = current_cash + payload.amount
+    elif payload.type == "WITHDRAWAL":
+        new_cash = current_cash - payload.amount
+    else:
+        raise HTTPException(status_code=400, detail="Invalid transaction type")
+        
+    database.update_branch_cash(payload.branch_id, new_cash)
+    
+    pub_conn = connect_to_rabbitmq()
+    pub_channel = pub_conn.channel()
+    msg_payload = json.dumps({
+        "type": "LOCAL_TX",
+        "tx_type": payload.type,
+        "amount": payload.amount
+    })
+    queue_name = f"branch_{payload.branch_id}_coordinator"
+    pub_channel.queue_declare(queue=queue_name)
+    pub_channel.basic_publish(exchange="", routing_key=queue_name, body=msg_payload)
+    pub_conn.close()
+    
+    return {"message": f"Local transaction {payload.type} successful"}
+
+
+@app.post("/reset")
+def trigger_system_reset():
+    """Reset the whole system back to $10,000 for each branch."""
+    database.update_branch_cash("101", 10000.0)
+    database.update_branch_cash("102", 10000.0)
+    
+    pub_conn = connect_to_rabbitmq()
+    pub_channel = pub_conn.channel()
+    msg_payload = json.dumps({
+        "type": "SYNC",
+        "amount": 10000.0
+    })
+    
+    for queue_name in ["branch_101_coordinator", "branch_102_coordinator"]:
+        pub_channel.queue_declare(queue=queue_name)
+        pub_channel.basic_publish(exchange="", routing_key=queue_name, body=msg_payload)
+        
+    pub_conn.close()
+    
+    return {"message": "System reset to $10000.0 per branch"}
 
 
 # =================================================================
