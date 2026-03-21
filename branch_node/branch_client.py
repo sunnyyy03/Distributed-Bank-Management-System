@@ -29,6 +29,7 @@ TRANSFER_QUEUE = "transfer_requests"
 # Shared mutable state guarded by a lock
 _state_lock = threading.Lock()
 current_cash = 10000.0  # latest known cash balance
+local_clock = 0         # branch Lamport clock
 
 
 def connect_to_rabbitmq():
@@ -65,9 +66,25 @@ def connect_to_rabbitmq():
 # 2PC Participant — Coordinator Queue Consumer
 # =================================================================
 
+def _send_branch_update():
+    """Publish current state to branch_updates queue so HQ status captures clock."""
+    update_payload = json.dumps({
+        "branch_id": BRANCH_ID,
+        "cash_amount": current_cash,
+        "lamport_clock": local_clock
+    })
+    try:
+        connection = pika.BlockingConnection(pika.ConnectionParameters(host=RABBITMQ_HOST))
+        channel = connection.channel()
+        channel.queue_declare(queue=QUEUE_NAME)
+        channel.basic_publish(exchange="", routing_key=QUEUE_NAME, body=update_payload)
+        connection.close()
+    except Exception as e:
+        print(f"Failed to send branch update: {e}")
+
 def _on_coordinator_message(ch, method, properties, body):
     """Handle PREPARE, COMMIT, and ABORT messages from the HQ Coordinator."""
-    global current_cash
+    global current_cash, local_clock
 
     data = json.loads(body)
     msg_type = data.get("type")
@@ -75,6 +92,13 @@ def _on_coordinator_message(ch, method, properties, body):
     sender_id = str(data.get("sender_id"))
     receiver_id = str(data.get("receiver_id"))
     amount = data.get("amount", 0)
+    incoming_clock = data.get("clock", 0)
+
+    # Distributed Lamport logical clock synchronization
+    if msg_type == "HARD_RESET":
+        local_clock = 0
+    else:
+        local_clock = max(local_clock, incoming_clock) + 1
 
     short_tx = tx_id[:8]
 
@@ -115,6 +139,7 @@ def _on_coordinator_message(ch, method, properties, body):
             "branch_id": BRANCH_ID,
             "vote": vote,
             "tx_id": tx_id,
+            "clock": local_clock,
         })
 
         reply_to = properties.reply_to
@@ -158,13 +183,13 @@ def _on_coordinator_message(ch, method, properties, body):
         )
 
     # ----------------------------------------------------------
-    # SYNC — hard reset of local state
+    # SYNC or HARD_RESET — hard reset of local state
     # ----------------------------------------------------------
-    elif msg_type == "SYNC":
+    elif msg_type in ["SYNC", "HARD_RESET"]:
         with _state_lock:
             current_cash = amount
             print(
-                f"Branch {BRANCH_ID} Chaos: SYNC received — "
+                f"Branch {BRANCH_ID} Chaos: {msg_type} received — "
                 f"forced balance reset to ${current_cash}"
             )
 
@@ -182,6 +207,9 @@ def _on_coordinator_message(ch, method, properties, body):
                 f"Branch {BRANCH_ID} Chaos: LOCAL_TX ({tx_type}) received — "
                 f"applied ${amount}, new balance ${current_cash}"
             )
+
+    if msg_type in ["COMMIT", "ABORT", "LOCAL_TX", "SYNC", "HARD_RESET"]:
+        _send_branch_update()
 
     ch.basic_ack(delivery_tag=method.delivery_tag)
 

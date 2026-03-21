@@ -170,6 +170,7 @@
           </div>
 
           <div class="flex items-center gap-5">
+            <div id="nav-hq-clock" class="text-xs font-bold text-gray-300 bg-surface-600 px-2 py-1 rounded border border-white/10 flex items-center justify-center">HQ Clock: --</div>
             <div id="connection-status" class="flex items-center gap-2 text-xs font-medium text-emerald-400">
               <span class="live-dot inline-block w-2 h-2 rounded-full bg-emerald-400"></span>
               LIVE
@@ -213,15 +214,8 @@
     <div id="view-network" class="fade-in">
       <main class="max-w-7xl mx-auto px-6 py-10 space-y-10">
 
-        <!-- Global System Clock -->
-        <section id="clock-section" class="text-center space-y-2">
-          <p class="text-xs font-semibold uppercase tracking-widest text-gray-500">Global System Clock (Lamport)</p>
-          <p id="hq-clock" class="text-7xl font-extrabold clock-shimmer tabular-nums">--</p>
-          <p id="last-update" class="text-xs text-gray-600">Waiting for data…</p>
-        </section>
-
         <!-- Summary Stats Bar -->
-        <section class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <section class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div class="bg-surface-700 rounded-xl p-5 border border-white/5">
             <p class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">Total Branches</p>
             <p id="stat-branches" class="text-2xl font-bold text-white">--</p>
@@ -229,10 +223,6 @@
           <div class="bg-surface-700 rounded-xl p-5 border border-white/5">
             <p class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">Network Liquidity</p>
             <p id="stat-liquidity" class="text-2xl font-bold text-emerald-400">--</p>
-          </div>
-          <div class="bg-surface-700 rounded-xl p-5 border border-white/5">
-            <p class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">Active Warnings</p>
-            <p id="stat-warnings" class="text-2xl font-bold text-red-400">--</p>
           </div>
         </section>
 
@@ -515,7 +505,7 @@
     /* ──────────────────────────────────────────────────────────────
        BRANCH CARDS
        ────────────────────────────────────────────────────────────── */
-    function buildCard(branch, index) {
+    function buildCard(branch, index, data) {
       const isWarning = branch.current_balance < branch.minimum_threshold;
       const isHighVolume = branch.current_balance >= (branch.minimum_threshold * 2.5);
       
@@ -548,6 +538,7 @@
             </div>` : ''}
           <p class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">Branch</p>
           <p class="text-3xl font-extrabold text-white mb-4">${branch.branch_id}</p>
+          <p class="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-6 inline-block bg-surface-600 px-2 py-1 rounded border border-white/5">⏱ Clock: <span id="clock-${branch.branch_id}" class="text-white">${data['branch_' + branch.branch_id + '_clock']}</span></p>
           <div class="space-y-3">
             <div>
               <p class="text-[11px] font-medium uppercase tracking-wider text-gray-500">Current Balance</p>
@@ -818,11 +809,7 @@
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
 
-        document.getElementById('hq-clock').textContent = data.hq_clock;
-
-        const now = new Date();
-        document.getElementById('last-update').textContent =
-          `Last updated ${now.toLocaleTimeString()}`;
+        document.getElementById('nav-hq-clock').textContent = 'HQ Clock: ' + data.hq_clock;
 
         const branches = data.network_status || [];
         const totalLiquidity = branches.reduce((s, b) => s + b.current_balance, 0);
@@ -831,14 +818,8 @@
         document.getElementById('stat-branches').textContent = branches.length;
         document.getElementById('stat-liquidity').textContent = formatCurrency(totalLiquidity);
 
-        const warnEl = document.getElementById('stat-warnings');
-        warnEl.textContent = warningCount;
-        warnEl.className = warningCount > 0
-          ? 'text-2xl font-bold text-red-400'
-          : 'text-2xl font-bold text-emerald-400';
-
         const grid = document.getElementById('branch-grid');
-        grid.innerHTML = branches.map((b, i) => buildCard(b, i)).join('');
+        grid.innerHTML = branches.map((b, i) => buildCard(b, i, data)).join('');
 
         const status = document.getElementById('connection-status');
         status.innerHTML = '<span class="live-dot inline-block w-2 h-2 rounded-full bg-emerald-400"></span> LIVE';
