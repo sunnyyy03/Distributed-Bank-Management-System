@@ -59,7 +59,7 @@ def init_db():
     """)
     cursor.execute("""
         INSERT OR IGNORE INTO Cash_Reserves (branch_id, current_balance, minimum_threshold)
-        VALUES ('101', 0.0, 10000.0)
+        VALUES ('101', 10000.0, 10000.0)
     """)
 
     # Seed Branch 102
@@ -69,7 +69,7 @@ def init_db():
     """)
     cursor.execute("""
         INSERT OR IGNORE INTO Cash_Reserves (branch_id, current_balance, minimum_threshold)
-        VALUES ('102', 0.0, 10000.0)
+        VALUES ('102', 10000.0, 10000.0)
     """)
 
     # ------------------------------------------------------------------

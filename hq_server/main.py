@@ -40,6 +40,7 @@ database.init_db()
 
 # Initialize HQ Lamport Clock
 hq_lamport_clock = 0
+branch_clocks = {"101": 0, "102": 0}
 
 RABBITMQ_HOST = "rabbitmq"
 QUEUE_NAME = "branch_updates"
@@ -64,6 +65,16 @@ class EmployeeCreate(BaseModel):
     branch_id: str
     name: str
     role: str
+
+class TransferRequest(BaseModel):
+    source_branch: str
+    dest_branch: str
+    amount: float
+
+class LocalTransactionRequest(BaseModel):
+    branch_id: str
+    type: str
+    amount: float
 
 
 # =================================================================
@@ -114,6 +125,8 @@ def _on_branch_update(ch, method, properties, body):
     branch_id = data["branch_id"]
     cash_amount = data["cash_amount"]
     received_clock = data["lamport_clock"]
+    
+    branch_clocks[branch_id] = received_clock
 
     # Lamport Logical Clock Algorithm
     hq_lamport_clock = max(hq_lamport_clock, received_clock) + 1
@@ -152,8 +165,15 @@ def _on_vote_reply(ch, method, properties, body):
     Stores each vote in the _votes dict keyed by correlation_id so
     the coordinator thread can collect them.
     """
+    global hq_lamport_clock
+    
     vote = json.loads(body)
     corr_id = properties.correlation_id
+    
+    # Process clock sync from branch
+    incoming_clock = vote.get("clock", 0)
+    branch_clocks[vote.get("branch_id")] = incoming_clock
+    hq_lamport_clock = max(hq_lamport_clock, incoming_clock) + 1
 
     with _vote_lock:
         if corr_id not in _votes:
@@ -218,12 +238,16 @@ def _on_transfer_request(ch, method, properties, body):
     pub_conn = connect_to_rabbitmq()
     pub_channel = pub_conn.channel()
 
+    # Phase 1: Internal PREPARE action
+    hq_lamport_clock += 1
+    
     prepare_payload = json.dumps({
         "type": "PREPARE",
         "tx_id": tx_id,
         "sender_id": sender_id,
         "receiver_id": receiver_id,
         "amount": amount,
+        "clock": hq_lamport_clock,
     })
 
     sender_queue = f"branch_{sender_id}_coordinator"
@@ -299,12 +323,15 @@ def _on_transfer_request(ch, method, properties, body):
         )
 
     # Broadcast the decision to both participant branches
+    hq_lamport_clock += 1
+    
     decision_payload = json.dumps({
         "type": decision,
         "tx_id": tx_id,
         "sender_id": sender_id,
         "receiver_id": receiver_id,
         "amount": amount,
+        "clock": hq_lamport_clock,
     })
 
     for queue in [sender_queue, receiver_queue]:
@@ -356,13 +383,147 @@ def start_background_consumers():
 def get_status():
     """Return the aggregated cash status of all branches."""
     status = database.get_all_cash_status()
-    return {"network_status": status, "hq_clock": hq_lamport_clock}
+    return {
+        "network_status": status, 
+        "hq_clock": hq_lamport_clock,
+        "branch_101_clock": branch_clocks.get("101", 0),
+        "branch_102_clock": branch_clocks.get("102", 0)
+    }
 
 
 @app.get("/schedule")
 def get_schedule():
     """Return the dynamically generated weekly shift schedule."""
     return scheduler.generate_weekly_schedule()
+
+
+# =================================================================
+# Chaos Controller Endpoints
+# =================================================================
+
+@app.post("/transfer")
+def trigger_transfer(payload: TransferRequest):
+    """Trigger a 2PC transfer by pushing to the transfer_requests queue."""
+    if payload.source_branch == payload.dest_branch:
+        raise HTTPException(status_code=400, detail="Source and destination branches cannot be the same.")
+
+    try:
+        payload_dict = payload.dict()
+        amount = float(payload_dict["amount"])
+        amount = round(amount, 2)
+    except (KeyError, ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="Invalid payload. Ensure all required fields are present and amount is a valid number.")
+
+    if amount <= 0:
+        raise HTTPException(status_code=400, detail="Transaction amount must be greater than $0.")
+
+    status = database.get_all_cash_status()
+    source_branch_info = next((b for b in status if b["branch_id"] == payload.source_branch), None)
+    if source_branch_info and source_branch_info["current_balance"] - amount < 0:
+        raise HTTPException(status_code=400, detail="Source branch has insufficient funds.")
+
+    dest_branch_info = next((b for b in status if b["branch_id"] == payload.dest_branch), None)
+    if dest_branch_info and dest_branch_info["current_balance"] + amount > 50000:
+        raise HTTPException(status_code=400, detail="Branch maximum capacity ($50,000) exceeded.")
+
+    global hq_lamport_clock
+    hq_lamport_clock += 1
+    
+    pub_conn = connect_to_rabbitmq()
+    pub_channel = pub_conn.channel()
+    
+    msg_payload = json.dumps({
+        "sender_id": payload.source_branch,
+        "receiver_id": payload.dest_branch,
+        "amount": amount
+    })
+    
+    pub_channel.queue_declare(queue=TRANSFER_QUEUE)
+    pub_channel.basic_publish(
+        exchange="",
+        routing_key=TRANSFER_QUEUE,
+        body=msg_payload,
+    )
+    pub_conn.close()
+    return {"message": "Transfer initiated via 2PC"}
+
+
+@app.post("/local-transaction")
+def trigger_local_tx(payload: LocalTransactionRequest):
+    """Execute a local deposit or withdrawal."""
+    try:
+        payload_dict = payload.dict()
+        amount = float(payload_dict["amount"])
+        amount = round(amount, 2)
+    except (KeyError, ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="Invalid payload. Ensure all required fields are present and amount is a valid number.")
+
+    if amount <= 0:
+        raise HTTPException(status_code=400, detail="Transaction amount must be greater than $0.")
+        
+    status = database.get_all_cash_status()
+    branch_info = next((b for b in status if b["branch_id"] == payload.branch_id), None)
+    if not branch_info:
+        raise HTTPException(status_code=404, detail="Branch not found")
+        
+    current_cash = branch_info["current_balance"]
+    if payload.type == "DEPOSIT":
+        if current_cash + amount > 50000:
+            raise HTTPException(status_code=400, detail="Branch maximum capacity ($50,000) exceeded.")
+        new_cash = current_cash + amount
+    elif payload.type == "WITHDRAWAL":
+        if current_cash - amount < 0:
+            raise HTTPException(status_code=400, detail="Insufficient funds. Balance cannot drop below $0.")
+        new_cash = current_cash - amount
+    else:
+        raise HTTPException(status_code=400, detail="Invalid transaction type")
+
+    global hq_lamport_clock
+    hq_lamport_clock += 1
+        
+    database.update_branch_cash(payload.branch_id, new_cash)
+    
+    pub_conn = connect_to_rabbitmq()
+    pub_channel = pub_conn.channel()
+    msg_payload = json.dumps({
+        "type": "LOCAL_TX",
+        "tx_type": payload.type,
+        "amount": amount,
+        "clock": hq_lamport_clock
+    })
+    queue_name = f"branch_{payload.branch_id}_coordinator"
+    pub_channel.queue_declare(queue=queue_name)
+    pub_channel.basic_publish(exchange="", routing_key=queue_name, body=msg_payload)
+    pub_conn.close()
+    
+    return {"message": f"Local transaction {payload.type} successful"}
+
+
+@app.post("/reset")
+def trigger_system_reset():
+    """Reset the whole system back to $10,000 for each branch."""
+    global hq_lamport_clock, branch_clocks
+    hq_lamport_clock = 0
+    branch_clocks = {"101": 0, "102": 0}
+    
+    database.update_branch_cash("101", 10000.0)
+    database.update_branch_cash("102", 10000.0)
+    
+    pub_conn = connect_to_rabbitmq()
+    pub_channel = pub_conn.channel()
+    msg_payload = json.dumps({
+        "type": "HARD_RESET",
+        "amount": 10000.0,
+        "clock": hq_lamport_clock
+    })
+    
+    for queue_name in ["branch_101_coordinator", "branch_102_coordinator"]:
+        pub_channel.queue_declare(queue=queue_name)
+        pub_channel.basic_publish(exchange="", routing_key=queue_name, body=msg_payload)
+        
+    pub_conn.close()
+    
+    return {"message": "System reset to $10000.0 per branch"}
 
 
 # =================================================================
