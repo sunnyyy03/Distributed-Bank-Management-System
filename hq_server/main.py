@@ -404,6 +404,28 @@ def get_schedule():
 @app.post("/transfer")
 def trigger_transfer(payload: TransferRequest):
     """Trigger a 2PC transfer by pushing to the transfer_requests queue."""
+    if payload.source_branch == payload.dest_branch:
+        raise HTTPException(status_code=400, detail="Source and destination branches cannot be the same.")
+
+    try:
+        payload_dict = payload.dict()
+        amount = float(payload_dict["amount"])
+        amount = round(amount, 2)
+    except (KeyError, ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="Invalid payload. Ensure all required fields are present and amount is a valid number.")
+
+    if amount <= 0:
+        raise HTTPException(status_code=400, detail="Transaction amount must be greater than $0.")
+
+    status = database.get_all_cash_status()
+    source_branch_info = next((b for b in status if b["branch_id"] == payload.source_branch), None)
+    if source_branch_info and source_branch_info["current_balance"] - amount < 0:
+        raise HTTPException(status_code=400, detail="Source branch has insufficient funds.")
+
+    dest_branch_info = next((b for b in status if b["branch_id"] == payload.dest_branch), None)
+    if dest_branch_info and dest_branch_info["current_balance"] + amount > 50000:
+        raise HTTPException(status_code=400, detail="Branch maximum capacity ($50,000) exceeded.")
+
     global hq_lamport_clock
     hq_lamport_clock += 1
     
@@ -413,7 +435,7 @@ def trigger_transfer(payload: TransferRequest):
     msg_payload = json.dumps({
         "sender_id": payload.source_branch,
         "receiver_id": payload.dest_branch,
-        "amount": payload.amount
+        "amount": amount
     })
     
     pub_channel.queue_declare(queue=TRANSFER_QUEUE)
@@ -429,9 +451,16 @@ def trigger_transfer(payload: TransferRequest):
 @app.post("/local-transaction")
 def trigger_local_tx(payload: LocalTransactionRequest):
     """Execute a local deposit or withdrawal."""
-    global hq_lamport_clock
-    hq_lamport_clock += 1
-    
+    try:
+        payload_dict = payload.dict()
+        amount = float(payload_dict["amount"])
+        amount = round(amount, 2)
+    except (KeyError, ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="Invalid payload. Ensure all required fields are present and amount is a valid number.")
+
+    if amount <= 0:
+        raise HTTPException(status_code=400, detail="Transaction amount must be greater than $0.")
+        
     status = database.get_all_cash_status()
     branch_info = next((b for b in status if b["branch_id"] == payload.branch_id), None)
     if not branch_info:
@@ -439,11 +468,18 @@ def trigger_local_tx(payload: LocalTransactionRequest):
         
     current_cash = branch_info["current_balance"]
     if payload.type == "DEPOSIT":
-        new_cash = current_cash + payload.amount
+        if current_cash + amount > 50000:
+            raise HTTPException(status_code=400, detail="Branch maximum capacity ($50,000) exceeded.")
+        new_cash = current_cash + amount
     elif payload.type == "WITHDRAWAL":
-        new_cash = current_cash - payload.amount
+        if current_cash - amount < 0:
+            raise HTTPException(status_code=400, detail="Insufficient funds. Balance cannot drop below $0.")
+        new_cash = current_cash - amount
     else:
         raise HTTPException(status_code=400, detail="Invalid transaction type")
+
+    global hq_lamport_clock
+    hq_lamport_clock += 1
         
     database.update_branch_cash(payload.branch_id, new_cash)
     
@@ -452,7 +488,7 @@ def trigger_local_tx(payload: LocalTransactionRequest):
     msg_payload = json.dumps({
         "type": "LOCAL_TX",
         "tx_type": payload.type,
-        "amount": payload.amount,
+        "amount": amount,
         "clock": hq_lamport_clock
     })
     queue_name = f"branch_{payload.branch_id}_coordinator"

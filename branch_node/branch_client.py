@@ -246,6 +246,9 @@ def run_branch():
     # Start the 2PC coordinator listener in a background thread
     threading.Thread(target=_coordinator_listener, daemon=True).start()
 
+    # Emit initial startup state back to HQ database immediately
+    _send_branch_update()
+
     # Block main thread indefinitely
     try:
         threading.Event().wait()

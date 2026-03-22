@@ -1,10 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Bank HQ — Real-Time Dashboard</title>
-  <meta name="description" content="Real-time monitoring dashboard for the Distributed Bank Management System Headquarters." />
+  <meta name="description"
+    content="Real-time monitoring dashboard for the Distributed Bank Management System Headquarters." />
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -22,19 +24,39 @@
     };
   </script>
   <style>
-    body { font-family: 'Inter', system-ui, sans-serif; }
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+    }
 
     /* ── Animations ────────────────────────────────────────── */
     @keyframes livePulse {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: .5; transform: scale(1.4); }
+
+      0%,
+      100% {
+        opacity: 1;
+        transform: scale(1);
+      }
+
+      50% {
+        opacity: .5;
+        transform: scale(1.4);
+      }
     }
-    .live-dot { animation: livePulse 1.6s ease-in-out infinite; }
+
+    .live-dot {
+      animation: livePulse 1.6s ease-in-out infinite;
+    }
 
     @keyframes shimmer {
-      0% { background-position: -200% center; }
-      100% { background-position: 200% center; }
+      0% {
+        background-position: -200% center;
+      }
+
+      100% {
+        background-position: 200% center;
+      }
     }
+
     .clock-shimmer {
       background: linear-gradient(90deg, #60a5fa 0%, #a78bfa 40%, #60a5fa 80%);
       background-size: 200% auto;
@@ -44,58 +66,139 @@
     }
 
     @keyframes warningPulse {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,.25); }
-      50% { box-shadow: 0 0 20px 4px rgba(239,68,68,.35); }
+
+      0%,
+      100% {
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, .25);
+      }
+
+      50% {
+        box-shadow: 0 0 20px 4px rgba(239, 68, 68, .35);
+      }
     }
-    .warning-card { animation: warningPulse 2s ease-in-out infinite; }
 
-    @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
-    .fade-up { animation: fadeUp .4s ease-out both; }
+    .warning-card {
+      animation: warningPulse 2s ease-in-out infinite;
+    }
 
-    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-    .fade-in { animation: fadeIn .5s ease-out both; }
+    @keyframes fadeUp {
+      from {
+        opacity: 0;
+        transform: translateY(12px);
+      }
 
-    @keyframes slideDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
-    .slide-down { animation: slideDown .4s ease-out both; }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .fade-up {
+      animation: fadeUp .4s ease-out both;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+      }
+
+      to {
+        opacity: 1;
+      }
+    }
+
+    .fade-in {
+      animation: fadeIn .5s ease-out both;
+    }
+
+    @keyframes slideDown {
+      from {
+        opacity: 0;
+        transform: translateY(-20px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .slide-down {
+      animation: slideDown .4s ease-out both;
+    }
 
     /* Login bg grid effect */
     .login-grid {
       background-image:
-        linear-gradient(rgba(59,130,246,.06) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(59,130,246,.06) 1px, transparent 1px);
+        linear-gradient(rgba(59, 130, 246, .06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(59, 130, 246, .06) 1px, transparent 1px);
       background-size: 60px 60px;
     }
 
     /* Custom scrollbar */
-    .staff-scroll::-webkit-scrollbar { width: 6px; }
-    .staff-scroll::-webkit-scrollbar-track { background: transparent; }
-    .staff-scroll::-webkit-scrollbar-thumb { background: #3b4252; border-radius: 3px; }
-    .staff-scroll::-webkit-scrollbar-thumb:hover { background: #4c566a; }
+    .staff-scroll::-webkit-scrollbar {
+      width: 6px;
+    }
 
-    .row-hover { transition: background-color .15s ease, transform .15s ease; }
-    .row-hover:hover { background-color: rgba(255,255,255,.04); }
+    .staff-scroll::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .staff-scroll::-webkit-scrollbar-thumb {
+      background: #3b4252;
+      border-radius: 3px;
+    }
+
+    .staff-scroll::-webkit-scrollbar-thumb:hover {
+      background: #4c566a;
+    }
+
+    .row-hover {
+      transition: background-color .15s ease, transform .15s ease;
+    }
+
+    .row-hover:hover {
+      background-color: rgba(255, 255, 255, .04);
+    }
 
     /* Tab underline animation */
-    .tab-btn { position: relative; }
+    .tab-btn {
+      position: relative;
+    }
+
     .tab-btn::after {
       content: '';
       position: absolute;
-      bottom: -1px; left: 0; right: 0;
+      bottom: -1px;
+      left: 0;
+      right: 0;
       height: 2px;
       background: linear-gradient(90deg, #3b82f6, #8b5cf6);
       border-radius: 1px;
       transform: scaleX(0);
       transition: transform .25s ease;
     }
-    .tab-btn.active::after { transform: scaleX(1); }
+
+    .tab-btn.active::after {
+      transform: scaleX(1);
+    }
 
     /* Login transition */
     .login-exit {
       animation: loginExit .6s ease-in forwards;
     }
+
     @keyframes loginExit {
-      0%   { opacity: 1; transform: scale(1); }
-      100% { opacity: 0; transform: scale(1.02); pointer-events: none; }
+      0% {
+        opacity: 1;
+        transform: scale(1);
+      }
+
+      100% {
+        opacity: 0;
+        transform: scale(1.02);
+        pointer-events: none;
+      }
     }
   </style>
 </head>
@@ -110,9 +213,11 @@
 
       <!-- Logo + Branding -->
       <div class="text-center mb-10 slide-down">
-        <div class="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-accent-500 to-indigo-500 flex items-center justify-center shadow-2xl shadow-accent-500/25 mb-5">
+        <div
+          class="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-accent-500 to-indigo-500 flex items-center justify-center shadow-2xl shadow-accent-500/25 mb-5">
           <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 14v4M12 14v4M16 14v4"/>
+            <path stroke-linecap="round" stroke-linejoin="round"
+              d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 14v4M12 14v4M16 14v4" />
           </svg>
         </div>
         <h1 class="text-2xl font-bold text-white mb-1">Bank HQ</h1>
@@ -120,7 +225,8 @@
       </div>
 
       <!-- Login Form Card -->
-      <div class="bg-surface-800 rounded-2xl p-8 border border-white/5 shadow-2xl slide-down" style="animation-delay: .1s">
+      <div class="bg-surface-800 rounded-2xl p-8 border border-white/5 shadow-2xl slide-down"
+        style="animation-delay: .1s">
         <h2 class="text-sm font-semibold uppercase tracking-widest text-gray-500 mb-6">Sign in to Dashboard</h2>
 
         <form id="login-form" autocomplete="off" class="space-y-4">
@@ -161,16 +267,18 @@
         <!-- Top row: Brand + Live indicator -->
         <div class="flex items-center justify-between py-3.5">
           <div class="flex items-center gap-3">
-            <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-accent-500 to-indigo-500 flex items-center justify-center shadow-lg shadow-accent-500/20">
+            <div
+              class="w-9 h-9 rounded-lg bg-gradient-to-br from-accent-500 to-indigo-500 flex items-center justify-center shadow-lg shadow-accent-500/20">
               <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 14v4M12 14v4M16 14v4"/>
+                <path stroke-linecap="round" stroke-linejoin="round"
+                  d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 14v4M12 14v4M16 14v4" />
               </svg>
             </div>
-            <h1 class="text-lg font-bold tracking-tight text-white">Bank HQ <span class="text-accent-400 font-medium">Dashboard</span></h1>
+            <h1 class="text-lg font-bold tracking-tight text-white">Bank HQ <span
+                class="text-accent-400 font-medium">Dashboard</span></h1>
           </div>
 
           <div class="flex items-center gap-5">
-            <div id="nav-hq-clock" class="text-xs font-bold text-gray-300 bg-surface-600 px-2 py-1 rounded border border-white/10 flex items-center justify-center">HQ Clock: --</div>
             <div id="connection-status" class="flex items-center gap-2 text-xs font-medium text-emerald-400">
               <span class="live-dot inline-block w-2 h-2 rounded-full bg-emerald-400"></span>
               LIVE
@@ -178,7 +286,8 @@
             <button id="logout-btn" title="Sign out"
               class="p-2 rounded-lg hover:bg-white/5 text-gray-500 hover:text-gray-300 transition-colors">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                <path stroke-linecap="round" stroke-linejoin="round"
+                  d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
               </svg>
             </button>
           </div>
@@ -186,20 +295,23 @@
 
         <!-- Tab bar -->
         <div class="flex gap-1 -mb-px">
-          <button class="tab-btn active px-5 py-2.5 text-sm font-medium text-white transition-colors rounded-t-lg hover:bg-white/5"
-                  data-tab="network" id="tab-network">
+          <button
+            class="tab-btn active px-5 py-2.5 text-sm font-medium text-white transition-colors rounded-t-lg hover:bg-white/5"
+            data-tab="network" id="tab-network">
             <span class="flex items-center gap-2">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
               Network & Liquidity
             </span>
           </button>
-          <button class="tab-btn px-5 py-2.5 text-sm font-medium text-gray-500 transition-colors rounded-t-lg hover:bg-white/5 hover:text-gray-300"
-                  data-tab="workforce" id="tab-workforce">
+          <button
+            class="tab-btn px-5 py-2.5 text-sm font-medium text-gray-500 transition-colors rounded-t-lg hover:bg-white/5 hover:text-gray-300"
+            data-tab="workforce" id="tab-workforce">
             <span class="flex items-center gap-2">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87M16 3.13a4 4 0 010 7.75M12 14a4 4 0 100-8 4 4 0 000 8z"/>
+                <path stroke-linecap="round" stroke-linejoin="round"
+                  d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87M16 3.13a4 4 0 010 7.75M12 14a4 4 0 100-8 4 4 0 000 8z" />
               </svg>
               Workforce & HR
             </span>
@@ -230,7 +342,8 @@
         <section>
           <div class="flex items-center justify-between mb-4">
             <h2 class="text-sm font-semibold uppercase tracking-widest text-gray-500">Branch Network</h2>
-            <button onclick="executeReset()" class="text-xs font-semibold uppercase tracking-wider px-4 py-2 rounded-lg bg-surface-600 hover:bg-surface-500 text-white transition-all border border-white/5 shadow-lg shadow-black/20 hover:shadow-black/40 active:scale-[0.98]">
+            <button onclick="executeReset()"
+              class="text-xs font-semibold uppercase tracking-wider px-4 py-2 rounded-lg bg-surface-600 hover:bg-surface-500 text-white transition-all border border-white/5 shadow-lg shadow-black/20 hover:shadow-black/40 active:scale-[0.98]">
               Reset Network
             </button>
           </div>
@@ -251,9 +364,11 @@
         <!-- HR Control Panel -->
         <section>
           <div class="flex items-center gap-3 mb-5">
-            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center shadow-lg shadow-violet-500/20">
+            <div
+              class="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center shadow-lg shadow-violet-500/20">
               <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87M16 3.13a4 4 0 010 7.75M12 14a4 4 0 100-8 4 4 0 000 8z"/>
+                <path stroke-linecap="round" stroke-linejoin="round"
+                  d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87M16 3.13a4 4 0 010 7.75M12 14a4 4 0 100-8 4 4 0 000 8z" />
               </svg>
             </div>
             <h2 class="text-sm font-semibold uppercase tracking-widest text-gray-500">HR Control Panel</h2>
@@ -264,7 +379,10 @@
             <!-- Left Column — Hire Staff -->
             <div class="bg-surface-700 rounded-2xl p-6 border border-white/5">
               <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-4 flex items-center gap-2">
-                <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2"
+                  viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                </svg>
                 Hire Staff
               </h3>
               <form id="hire-form" class="space-y-4" autocomplete="off">
@@ -289,7 +407,9 @@
                       <option value="101">101 — HQ Local</option>
                       <option value="102">102 — Downtown</option>
                     </select>
-                    <p id="branch-na" class="hidden w-full bg-surface-600 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-gray-500">N/A</p>
+                    <p id="branch-na"
+                      class="hidden w-full bg-surface-600 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-gray-500">
+                      N/A</p>
                   </div>
                 </div>
                 <button id="hire-btn" type="submit"
@@ -303,7 +423,11 @@
             <!-- Right Column — Active Staff -->
             <div class="bg-surface-700 rounded-2xl p-6 border border-white/5 flex flex-col">
               <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-4 flex items-center gap-2">
-                <svg class="w-4 h-4 text-accent-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m10-7.13a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                <svg class="w-4 h-4 text-accent-400" fill="none" stroke="currentColor" stroke-width="2"
+                  viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round"
+                    d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m10-7.13a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
                 Active Staff
                 <span id="staff-count" class="ml-auto text-gray-500 font-normal">—</span>
               </h3>
@@ -319,7 +443,9 @@
                     </tr>
                   </thead>
                   <tbody id="staff-table-body">
-                    <tr><td colspan="5" class="text-center text-gray-600 py-8">Loading employees…</td></tr>
+                    <tr>
+                      <td colspan="5" class="text-center text-gray-600 py-8">Loading employees…</td>
+                    </tr>
                   </tbody>
                 </table>
               </div>
@@ -331,15 +457,21 @@
         <!-- Dynamic Workforce Schedule -->
         <section>
           <div class="flex items-center gap-3 mb-5">
-            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-lg shadow-amber-500/20">
+            <div
+              class="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-lg shadow-amber-500/20">
               <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                <path stroke-linecap="round" stroke-linejoin="round"
+                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
             </div>
             <h2 class="text-sm font-semibold uppercase tracking-widest text-gray-500">Live Weekly Schedule</h2>
             <div class="ml-auto flex items-center gap-4 text-[10px] font-medium uppercase tracking-wider">
-              <span class="flex items-center gap-1.5"><span class="inline-block w-2.5 h-2.5 rounded-sm bg-sky-500/30 border border-sky-400/40"></span><span class="text-sky-400">Backup Staff</span></span>
-              <span class="flex items-center gap-1.5"><span class="inline-block w-2.5 h-2.5 rounded-sm bg-red-500/30 border border-red-400/40"></span><span class="text-red-400">Unassigned</span></span>
+              <span class="flex items-center gap-1.5"><span
+                  class="inline-block w-2.5 h-2.5 rounded-sm bg-sky-500/30 border border-sky-400/40"></span><span
+                  class="text-sky-400">Backup Staff</span></span>
+              <span class="flex items-center gap-1.5"><span
+                  class="inline-block w-2.5 h-2.5 rounded-sm bg-red-500/30 border border-red-400/40"></span><span
+                  class="text-red-400">Unassigned</span></span>
             </div>
           </div>
 
@@ -353,7 +485,7 @@
 
     <!-- Footer -->
     <footer class="max-w-7xl mx-auto px-6 py-8 text-center text-xs text-gray-600 border-t border-white/5">
-      Distributed Bank Management System &middot; Polling every 2 s
+      Distributed Bank Management System
     </footer>
 
   </div><!-- /app -->
@@ -366,19 +498,19 @@
     /* ──────────────────────────────────────────────────────────────
        Configuration
        ────────────────────────────────────────────────────────────── */
-    const BASE_URL      = 'http://localhost:8000';
-    const STATUS_URL    = `${BASE_URL}/status`;
+    const BASE_URL = 'http://localhost:8000';
+    const STATUS_URL = `${BASE_URL}/status`;
     const EMPLOYEES_URL = `${BASE_URL}/employees`;
-    const EMPLOYEE_URL  = `${BASE_URL}/employee`;
-    const SCHEDULE_URL  = `${BASE_URL}/schedule`;
+    const EMPLOYEE_URL = `${BASE_URL}/employee`;
+    const SCHEDULE_URL = `${BASE_URL}/schedule`;
     const POLL_INTERVAL = 2000;
-    const WEEKDAYS      = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+    const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
     /* ──────────────────────────────────────────────────────────────
        State
        ────────────────────────────────────────────────────────────── */
-    let isLoggedIn  = false;
-    let activeTab   = 'network';   // 'network' | 'workforce'
+    let isLoggedIn = false;
+    let activeTab = 'network';   // 'network' | 'workforce'
     let pollTimerId = null;
     let cachedEmployees = {};      // { employee_id: { role, ... } }
 
@@ -443,7 +575,7 @@
        TAB SWITCHING
        ────────────────────────────────────────────────────────────── */
     const tabButtons = document.querySelectorAll('.tab-btn');
-    const viewNetwork   = document.getElementById('view-network');
+    const viewNetwork = document.getElementById('view-network');
     const viewWorkforce = document.getElementById('view-workforce');
 
     tabButtons.forEach(btn => {
@@ -483,7 +615,7 @@
        ────────────────────────────────────────────────────────────── */
     document.getElementById('hire-role').addEventListener('change', function () {
       const branchSelect = document.getElementById('hire-branch');
-      const branchNA     = document.getElementById('branch-na');
+      const branchNA = document.getElementById('branch-na');
       if (this.value === 'Backup') {
         branchSelect.classList.add('hidden');
         branchSelect.removeAttribute('required');
@@ -507,8 +639,9 @@
        ────────────────────────────────────────────────────────────── */
     function buildCard(branch, index, data) {
       const isWarning = branch.current_balance < branch.minimum_threshold;
+      const isMaxCapacity = branch.current_balance >= 50000;
       const isHighVolume = branch.current_balance >= (branch.minimum_threshold * 2.5);
-      
+
       let border = 'border-white/5';
       let bg = 'bg-surface-700';
       let glow = '';
@@ -528,7 +661,13 @@
       return `
         <div class="fade-up ${bg} ${glow} rounded-2xl p-6 border ${border} transition-all duration-300 relative"
              style="animation-delay: ${index * 80}ms">
-          ${isWarning ? `
+          ${isMaxCapacity ? `
+            <div class="absolute top-3 right-3 flex gap-2">
+              <span class="flex items-center gap-1 px-2 py-1 text-xs font-bold text-blue-400 bg-blue-900/30 border border-blue-500 rounded-md">⚡ HIGH VOLUME</span>
+              <div class="flex items-center gap-1.5 bg-red-600/20 text-red-400 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border border-red-500/50 shadow-[0_0_15px_rgba(239,68,68,0.3)]">
+                🛑 MAX CAPACITY
+              </div>
+            </div>` : isWarning ? `
             <div class="absolute top-3 right-3 flex items-center gap-1.5 bg-red-500/20 text-red-400 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border border-red-500/30">
               <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
               Liquidity Warning
@@ -589,9 +728,9 @@
 
       const roleBadge = (role) => {
         const map = {
-          'Manager':  'bg-violet-500/20 text-violet-300 border-violet-500/30',
-          'Teller':   'bg-sky-500/20 text-sky-300 border-sky-500/30',
-          'Backup':   'bg-amber-500/20 text-amber-300 border-amber-500/30',
+          'Manager': 'bg-violet-500/20 text-violet-300 border-violet-500/30',
+          'Teller': 'bg-sky-500/20 text-sky-300 border-sky-500/30',
+          'Backup': 'bg-amber-500/20 text-amber-300 border-amber-500/30',
         };
         return map[role] || 'bg-gray-500/20 text-gray-300 border-gray-500/30';
       };
@@ -651,72 +790,72 @@
                   <tr class="text-[10px] uppercase tracking-wider text-gray-500 border-b border-white/5">
                     <th class="text-left py-2.5 pl-6 font-semibold w-24">Day</th>
                     ${(() => {
-                      let maxShifts = 0;
-                      for (const day of WEEKDAYS) {
-                        const shifts = (info.days && info.days[day]) || [];
-                        if (shifts.length > maxShifts) maxShifts = shifts.length;
-                      }
-                      let ths = '';
-                      for (let i = 1; i <= maxShifts; i++) {
-                        ths += '<th class="text-left py-2.5 px-3 font-semibold"></th>';
-                      }
-                      return ths;
-                    })()}
+            let maxShifts = 0;
+            for (const day of WEEKDAYS) {
+              const shifts = (info.days && info.days[day]) || [];
+              if (shifts.length > maxShifts) maxShifts = shifts.length;
+            }
+            let ths = '';
+            for (let i = 1; i <= maxShifts; i++) {
+              ths += '<th class="text-left py-2.5 px-3 font-semibold"></th>';
+            }
+            return ths;
+          })()}
                   </tr>
                 </thead>
                 <tbody>
                   ${WEEKDAYS.map(day => {
-                    const shifts = (info.days && info.days[day]) || [];
-                    let maxShifts = 0;
-                    for (const d of WEEKDAYS) {
-                      const s = (info.days && info.days[d]) || [];
-                      if (s.length > maxShifts) maxShifts = s.length;
-                    }
+            const shifts = (info.days && info.days[day]) || [];
+            let maxShifts = 0;
+            for (const d of WEEKDAYS) {
+              const s = (info.days && info.days[d]) || [];
+              if (s.length > maxShifts) maxShifts = s.length;
+            }
 
-                    let cells = '';
-                    for (let i = 0; i < maxShifts; i++) {
-                      if (i < shifts.length) {
-                        const s = shifts[i];
-                        const isUnassigned = s.assigned_to && (s.assigned_to.includes('UNASSIGNED') || s.assigned_to.includes('NEED BACKUP'));
-                        const empRecord = s.employee_id ? cachedEmployees[s.employee_id] : null;
-                        const isBackupEmployee = s.role === 'Backup' || (empRecord && empRecord.role === 'Backup');
+            let cells = '';
+            for (let i = 0; i < maxShifts; i++) {
+              if (i < shifts.length) {
+                const s = shifts[i];
+                const isUnassigned = s.assigned_to && (s.assigned_to.includes('UNASSIGNED') || s.assigned_to.includes('NEED BACKUP'));
+                const empRecord = s.employee_id ? cachedEmployees[s.employee_id] : null;
+                const isBackupEmployee = s.role === 'Backup' || (empRecord && empRecord.role === 'Backup');
 
-                        let cellBg = '';
-                        let textCol = 'text-gray-300';
-                        let roleCol = 'text-gray-500';
-                        let displayName = s.assigned_to;
-                        let displayRole = s.role;
+                let cellBg = '';
+                let textCol = 'text-gray-300';
+                let roleCol = 'text-gray-500';
+                let displayName = s.assigned_to;
+                let displayRole = s.role;
 
-                        if (isUnassigned) {
-                          cellBg = 'bg-red-500/10 border border-red-400/20 rounded-lg';
-                          textCol = 'text-red-300';
-                          roleCol = 'text-red-400';
-                          displayName = 'UNASSIGNED';
-                        } else if (isBackupEmployee) {
-                          cellBg = 'bg-sky-500/10 border border-sky-400/20 rounded-lg';
-                          textCol = 'text-sky-200';
-                          roleCol = 'text-sky-400';
-                          displayRole = 'BACKUP';
-                        }
+                if (isUnassigned) {
+                  cellBg = 'bg-red-500/10 border border-red-400/20 rounded-lg';
+                  textCol = 'text-red-300';
+                  roleCol = 'text-red-400';
+                  displayName = 'UNASSIGNED';
+                } else if (isBackupEmployee) {
+                  cellBg = 'bg-sky-500/10 border border-sky-400/20 rounded-lg';
+                  textCol = 'text-sky-200';
+                  roleCol = 'text-sky-400';
+                  displayRole = 'BACKUP';
+                }
 
-                        cells += `
+                cells += `
                           <td class="py-2.5 px-3">
                             <div class="px-2.5 py-1.5 ${cellBg}">
                               <p class="font-medium ${textCol} text-xs">${displayName}</p>
                               <p class="${roleCol} text-[10px] uppercase tracking-wider font-semibold">${displayRole}</p>
                             </div>
                           </td>`;
-                      } else {
-                        cells += '<td class="py-2.5 px-3"></td>';
-                      }
-                    }
+              } else {
+                cells += '<td class="py-2.5 px-3"></td>';
+              }
+            }
 
-                    return `
+            return `
                       <tr class="row-hover border-b border-white/[.03]">
                         <td class="py-2.5 pl-6 font-semibold text-white text-xs">${day.slice(0, 3)}</td>
                         ${cells}
                       </tr>`;
-                  }).join('')}
+          }).join('')}
                 </tbody>
               </table>
             </div>
@@ -764,7 +903,7 @@
       btn.textContent = 'Hiring…';
 
       try {
-      const payload = {
+        const payload = {
           branch_id: document.getElementById('hire-role').value === 'Backup' ? '101' : document.getElementById('hire-branch').value,
           name: document.getElementById('hire-name').value.trim(),
           role: document.getElementById('hire-role').value,
@@ -809,8 +948,6 @@
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
 
-        document.getElementById('nav-hq-clock').textContent = 'HQ Clock: ' + data.hq_clock;
-
         const branches = data.network_status || [];
         const totalLiquidity = branches.reduce((s, b) => s + b.current_balance, 0);
         const warningCount = branches.filter(b => b.current_balance < b.minimum_threshold).length;
@@ -851,15 +988,15 @@
     document.getElementById('hire-form').addEventListener('submit', hireEmployee);
 
     // Reusable Action Functions
-    window.executeLocalTx = async function(branchId, type, amount) {
+    window.executeLocalTx = async function (branchId, type, amount) {
       await executeAction(`${BASE_URL}/local-transaction`, { branch_id: branchId, type: type, amount: amount });
     };
 
-    window.executeWire = async function(source, dest, amount) {
+    window.executeWire = async function (source, dest, amount) {
       await executeAction(`${BASE_URL}/transfer`, { source_branch: source, dest_branch: dest, amount: amount });
     };
 
-    window.executeReset = async function() {
+    window.executeReset = async function () {
       await executeAction(`${BASE_URL}/reset`, {});
     };
 
@@ -870,22 +1007,28 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          const errMsg = errData.detail || `HTTP ${res.status}`;
+          alert(errMsg);
+          return;
+        }
         setTimeout(pollAll, 500);
       } catch (err) {
         console.error("Action error", err);
+        alert("Action failed: " + err.message);
       }
     }
 
     /* ──────────────────────────────────────────────────────────────
        DROPDOWN MENU LOGIC
        ────────────────────────────────────────────────────────────── */
-    window.toggleDropdown = function(id) {
+    window.toggleDropdown = function (id) {
       const dropdown = document.getElementById(id);
       if (dropdown) dropdown.classList.toggle('hidden');
     };
 
-    window.addEventListener('click', function(e) {
+    window.addEventListener('click', function (e) {
       // Close all dropdowns if click is outside of dropdowns AND their triggers
       if (!e.target.closest('.dropdown-container')) {
         const dropdowns = document.querySelectorAll('[id^="dropdown-"]');
@@ -898,12 +1041,29 @@
   <!-- Shake animation for failed login -->
   <style>
     @keyframes shake {
-      0%, 100% { transform: translateX(0); }
-      20% { transform: translateX(-8px); }
-      40% { transform: translateX(8px); }
-      60% { transform: translateX(-6px); }
-      80% { transform: translateX(6px); }
+
+      0%,
+      100% {
+        transform: translateX(0);
+      }
+
+      20% {
+        transform: translateX(-8px);
+      }
+
+      40% {
+        transform: translateX(8px);
+      }
+
+      60% {
+        transform: translateX(-6px);
+      }
+
+      80% {
+        transform: translateX(6px);
+      }
     }
   </style>
 </body>
+
 </html>
