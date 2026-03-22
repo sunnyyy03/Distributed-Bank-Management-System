@@ -75,26 +75,13 @@ def init_db():
     # ------------------------------------------------------------------
     # Seed Employees
     # ------------------------------------------------------------------
-    # Branch 101 (Large): 1 Manager, 2 Tellers
-    employees_101 = [
-        ("E1001", "101", "Alice Johnson",  "Manager"),
-        ("E1002", "101", "Bob Smith",      "Teller"),
-        ("E1003", "101", "Carol Davis",    "Teller"),
+    # Baseline constraints: 1 Manager per branch
+    baseline_employees = [
+        ("E1001", "101", "Alice", "Manager"),
+        ("E2001", "102", "Bob",   "Manager"),
     ]
 
-    # Branch 102 (Medium): 1 Manager, 1 Teller
-    employees_102 = [
-        ("E2001", "102", "Grace Kim",      "Manager"),
-        ("E2002", "102", "Hank Brown",     "Teller"),
-    ]
-
-    # Network Backups (branch-agnostic, assigned to 101 for schema only)
-    backups = [
-        ("F0001", "101", "Eva Martinez",   "Backup"),
-        ("F0002", "101", "Frank Wilson",   "Backup"),
-    ]
-
-    for emp in employees_101 + employees_102 + backups:
+    for emp in baseline_employees:
         cursor.execute(
             "INSERT OR IGNORE INTO Employees (employee_id, branch_id, name, role) "
             "VALUES (?, ?, ?, ?)",
@@ -117,6 +104,28 @@ def update_branch_cash(branch_id: str, amount: float):
         """,
         (amount, branch_id),
     )
+    conn.commit()
+    conn.close()
+
+
+def reset_hr_rosters():
+    """Clear all employees and reseed the baseline rosters explicitly."""
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM Employees")
+    
+    baseline_employees = [
+        ("E1001", "101", "Alice", "Manager"),
+        ("E2001", "102", "Bob",   "Manager"),
+    ]
+
+    for emp in baseline_employees:
+        cursor.execute(
+            "INSERT INTO Employees (employee_id, branch_id, name, role) "
+            "VALUES (?, ?, ?, ?)",
+            emp,
+        )
+        
     conn.commit()
     conn.close()
 

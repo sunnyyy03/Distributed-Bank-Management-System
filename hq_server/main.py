@@ -507,8 +507,7 @@ def trigger_system_reset():
     branch_clocks = {"101": 0, "102": 0}
     
     database.update_branch_cash("101", 10000.0)
-    database.update_branch_cash("102", 10000.0)
-    
+    database.update_branch_cash("102", 10000.0)    
     pub_conn = connect_to_rabbitmq()
     pub_channel = pub_conn.channel()
     msg_payload = json.dumps({
@@ -526,6 +525,13 @@ def trigger_system_reset():
     return {"message": "System reset to $10000.0 per branch"}
 
 
+@app.post("/hr/reset")
+def trigger_hr_reset():
+    """Clear all employees and reset to baseline (Alice and Bob as Managers)."""
+    database.reset_hr_rosters()
+    return {"message": "HR rosters reset to baseline."}
+
+
 # =================================================================
 # Employee CRUD Endpoints
 # =================================================================
@@ -539,6 +545,27 @@ def list_employees():
 @app.post("/employee")
 def hire_employee(payload: EmployeeCreate):
     """Add a new employee record and return the generated ID."""
+    
+    employees = database.get_employees()
+    branch_employees = [e for e in employees if e["branch_id"] == payload.branch_id]
+    
+    if payload.role.upper() == "MANAGER":
+        raise HTTPException(status_code=400, detail="Branch already has a Manager.")
+        
+    elif payload.role.upper() == "TELLER":
+        tellers = [e for e in branch_employees if e["role"].upper() == "TELLER"]
+        if len(tellers) >= 2:
+            raise HTTPException(status_code=400, detail="Maximum Teller capacity (2) reached.")
+            
+    elif payload.role.upper() == "BACKUP":
+        backups = [e for e in branch_employees if e["role"].upper() == "BACKUP"]
+        if len(backups) >= 1:
+            raise HTTPException(status_code=400, detail="Maximum Backup capacity (1) reached.")
+            
+        branch_status = next((b for b in database.get_all_cash_status() if b["branch_id"] == payload.branch_id), None)
+        if not branch_status or branch_status["current_balance"] < 25000:
+            raise HTTPException(status_code=400, detail="Backups can only be hired during High Volume states (>= $25,000).")
+
     try:
         new_id = database.add_employee(
             branch_id=payload.branch_id,
