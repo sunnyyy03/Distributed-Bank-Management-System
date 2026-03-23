@@ -402,6 +402,7 @@
                     <label for="hire-role" class="block text-xs font-medium text-gray-400 mb-1.5">Role</label>
                     <select id="hire-role" required
                       class="w-full bg-surface-600 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-accent-500/50 focus:border-accent-500 transition appearance-none">
+                      <option value="" disabled selected>-- Select Role --</option>
                       <option value="Teller">Teller</option>
                       <option value="Backup">Backup</option>
                     </select>
@@ -410,8 +411,9 @@
                     <label for="hire-branch" class="block text-xs font-medium text-gray-400 mb-1.5">Branch</label>
                     <select id="hire-branch" required
                       class="w-full bg-surface-600 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-accent-500/50 focus:border-accent-500 transition appearance-none">
-                      <option value="101">101 — HQ Local</option>
-                      <option value="102">102 — Downtown</option>
+                      <option value="" disabled selected>-- Select Branch --</option>
+                      <option value="101">Branch 101</option>
+                      <option value="102">Branch 102</option>
                     </select>
                     <p id="branch-na"
                       class="hidden w-full bg-surface-600 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-gray-500">
@@ -793,9 +795,9 @@
               ${(() => {
             const branchId = branchLabel.split(' ')[1] || '101';
             const branchEmps = Object.values(cachedEmployees).filter(e => e.branch_id === branchId);
-            const managers = branchEmps.filter(e => e.role === 'Manager');
-            const tellers = branchEmps.filter(e => e.role === 'Teller');
-            const backups = branchEmps.filter(e => e.role === 'Backup');
+            const managers = branchEmps.filter(e => e.role.toUpperCase() === 'MANAGER');
+            const tellers = branchEmps.filter(e => e.role.toUpperCase() === 'TELLER' || e.slot_target === 'TELLER');
+            const backups = branchEmps.filter(e => e.role.toUpperCase() === 'BACKUP' || e.slot_target === 'BACKUP');
 
             const currentBalance = info.current_balance || 0;
             const showBackupCol = currentBalance >= 25000 || backups.length > 0;
@@ -814,9 +816,9 @@
                   <div class="flex flex-col mt-2 space-y-1.5">
                     ${WEEKDAYS.map(day => {
               const s1 = { name: managers[0]?.name || 'UNASSIGNED', role: 'MANAGER', missing: !managers[0] };
-              const s2 = { name: tellers[0]?.name || 'UNASSIGNED TELLER', role: 'TELLER', missing: !tellers[0] };
-              const s3 = { name: tellers[1]?.name || 'UNASSIGNED TELLER', role: 'TELLER', missing: !tellers[1] };
-              const s4 = { name: backups[0]?.name || 'UNASSIGNED BACKUP', role: 'BACKUP', missing: !backups[0] };
+              const s2 = { name: tellers[0]?.name || 'UNASSIGNED TELLER', role: tellers[0]?.role?.toUpperCase() || 'TELLER', missing: !tellers[0] };
+              const s3 = { name: tellers[1]?.name || 'UNASSIGNED TELLER', role: tellers[1]?.role?.toUpperCase() || 'TELLER', missing: !tellers[1] };
+              const s4 = { name: backups[0]?.name || 'UNASSIGNED BACKUP', role: backups[0]?.role?.toUpperCase() || 'BACKUP', missing: !backups[0] };
 
               const renderSlot = (slot) => {
                 if (slot.hideMissing) {
@@ -831,7 +833,7 @@
                   cellBg = 'bg-red-500/10 border border-red-400/20';
                   textCol = 'text-red-300';
                   roleCol = 'text-red-400';
-                } else if (slot.role === 'BACKUP') {
+                } else if (slot.role === 'BACKUP' || slot.role === 'BACKUP TELLER') {
                   cellBg = 'bg-sky-500/10 border border-sky-400/20';
                   textCol = 'text-sky-200';
                   roleCol = 'text-sky-400';
@@ -918,7 +920,13 @@
 
         feedback.textContent = `✓ ${data.message}`;
         feedback.className = 'text-xs text-center h-4 text-emerald-400';
+        
+        // 1. Let the browser reset the form values back to the 'selected' default options
         document.getElementById('hire-form').reset();
+
+        // 2. Manually unlock the Branch dropdown in case the 'Backup' role disabled it
+        const branchInput = document.getElementById('hire-branch');
+        branchInput.disabled = false; 
 
         await Promise.all([fetchEmployees(), fetchSchedule()]);
       } catch (err) {
