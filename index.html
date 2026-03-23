@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Bank HQ — Real-Time Dashboard</title>
+  <title>Bank HQ</title>
   <meta name="description"
     content="Real-time monitoring dashboard for the Distributed Bank Management System Headquarters." />
   <script src="https://cdn.tailwindcss.com"></script>
@@ -920,13 +920,13 @@
 
         feedback.textContent = `✓ ${data.message}`;
         feedback.className = 'text-xs text-center h-4 text-emerald-400';
-        
+
         // 1. Let the browser reset the form values back to the 'selected' default options
         document.getElementById('hire-form').reset();
 
         // 2. Manually unlock the Branch dropdown in case the 'Backup' role disabled it
         const branchInput = document.getElementById('hire-branch');
-        branchInput.disabled = false; 
+        branchInput.disabled = false;
 
         await Promise.all([fetchEmployees(), fetchSchedule()]);
       } catch (err) {
