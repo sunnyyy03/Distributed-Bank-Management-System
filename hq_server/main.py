@@ -29,10 +29,10 @@ app = FastAPI(title="Bank HQ Server")
 # Allow the frontend to fetch data without browser security blocks
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],  
-    allow_headers=["*"], 
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Initialize the SQLite database as soon as the API server starts
@@ -125,13 +125,12 @@ def _on_branch_update(ch, method, properties, body):
     branch_id = data["branch_id"]
     cash_amount = data["cash_amount"]
     received_clock = data["lamport_clock"]
-    
+
     branch_clocks[branch_id] = received_clock
 
     # Lamport Logical Clock Algorithm
     hq_lamport_clock = max(hq_lamport_clock, received_clock) + 1
 
-    # Save the data persistently to SQLite
     database.update_branch_cash(branch_id, cash_amount)
 
     print(
@@ -166,10 +165,10 @@ def _on_vote_reply(ch, method, properties, body):
     the coordinator thread can collect them.
     """
     global hq_lamport_clock
-    
+
     vote = json.loads(body)
     corr_id = properties.correlation_id
-    
+
     # Process clock sync from branch
     incoming_clock = vote.get("clock", 0)
     branch_clocks[vote.get("branch_id")] = incoming_clock
@@ -201,7 +200,7 @@ def _vote_reply_loop():
 
 
 # =================================================================
-# 2PC — Transfer Request Consumer  (Transaction Coordinator)
+# 2PC — Transfer Request Consumer (Transaction Coordinator)
 # =================================================================
 
 def _on_transfer_request(ch, method, properties, body):
@@ -238,9 +237,8 @@ def _on_transfer_request(ch, method, properties, body):
     pub_conn = connect_to_rabbitmq()
     pub_channel = pub_conn.channel()
 
-    # Phase 1: Internal PREPARE action
     hq_lamport_clock += 1
-    
+
     prepare_payload = json.dumps({
         "type": "PREPARE",
         "tx_id": tx_id,
@@ -322,9 +320,8 @@ def _on_transfer_request(ch, method, properties, body):
             f"(needed 2× YES)  (tx={tx_id[:8]}...)"
         )
 
-    # Broadcast the decision to both participant branches
     hq_lamport_clock += 1
-    
+
     decision_payload = json.dumps({
         "type": decision,
         "tx_id": tx_id,
@@ -384,10 +381,10 @@ def get_status():
     """Return the aggregated cash status of all branches."""
     status = database.get_all_cash_status()
     return {
-        "network_status": status, 
+        "network_status": status,
         "hq_clock": hq_lamport_clock,
         "branch_101_clock": branch_clocks.get("101", 0),
-        "branch_102_clock": branch_clocks.get("102", 0)
+        "branch_102_clock": branch_clocks.get("102", 0),
     }
 
 
@@ -428,16 +425,16 @@ def trigger_transfer(payload: TransferRequest):
 
     global hq_lamport_clock
     hq_lamport_clock += 1
-    
+
     pub_conn = connect_to_rabbitmq()
     pub_channel = pub_conn.channel()
-    
+
     msg_payload = json.dumps({
         "sender_id": payload.source_branch,
         "receiver_id": payload.dest_branch,
-        "amount": amount
+        "amount": amount,
     })
-    
+
     pub_channel.queue_declare(queue=TRANSFER_QUEUE)
     pub_channel.basic_publish(
         exchange="",
@@ -460,12 +457,12 @@ def trigger_local_tx(payload: LocalTransactionRequest):
 
     if amount <= 0:
         raise HTTPException(status_code=400, detail="Transaction amount must be greater than $0.")
-        
+
     status = database.get_all_cash_status()
     branch_info = next((b for b in status if b["branch_id"] == payload.branch_id), None)
     if not branch_info:
         raise HTTPException(status_code=404, detail="Branch not found")
-        
+
     current_cash = branch_info["current_balance"]
     if payload.type == "DEPOSIT":
         if current_cash + amount > 50000:
@@ -480,22 +477,22 @@ def trigger_local_tx(payload: LocalTransactionRequest):
 
     global hq_lamport_clock
     hq_lamport_clock += 1
-        
+
     database.update_branch_cash(payload.branch_id, new_cash)
-    
+
     pub_conn = connect_to_rabbitmq()
     pub_channel = pub_conn.channel()
     msg_payload = json.dumps({
         "type": "LOCAL_TX",
         "tx_type": payload.type,
         "amount": amount,
-        "clock": hq_lamport_clock
+        "clock": hq_lamport_clock,
     })
     queue_name = f"branch_{payload.branch_id}_coordinator"
     pub_channel.queue_declare(queue=queue_name)
     pub_channel.basic_publish(exchange="", routing_key=queue_name, body=msg_payload)
     pub_conn.close()
-    
+
     return {"message": f"Local transaction {payload.type} successful"}
 
 
@@ -505,23 +502,24 @@ def trigger_system_reset():
     global hq_lamport_clock, branch_clocks
     hq_lamport_clock = 0
     branch_clocks = {"101": 0, "102": 0}
-    
+
     database.update_branch_cash("101", 10000.0)
-    database.update_branch_cash("102", 10000.0)    
+    database.update_branch_cash("102", 10000.0)
+
     pub_conn = connect_to_rabbitmq()
     pub_channel = pub_conn.channel()
     msg_payload = json.dumps({
         "type": "HARD_RESET",
         "amount": 10000.0,
-        "clock": hq_lamport_clock
+        "clock": hq_lamport_clock,
     })
-    
+
     for queue_name in ["branch_101_coordinator", "branch_102_coordinator"]:
         pub_channel.queue_declare(queue=queue_name)
         pub_channel.basic_publish(exchange="", routing_key=queue_name, body=msg_payload)
-        
+
     pub_conn.close()
-    
+
     return {"message": "System reset to $10000.0 per branch"}
 
 
@@ -541,53 +539,53 @@ def list_employees():
     """Return all employees, dynamically deploying floaters via a greedy algorithm."""
     raw_employees = database.get_employees()
     status = database.get_all_cash_status()
-    
+
     assigned_staff = [dict(e) for e in raw_employees if e["branch_id"] != "N/A"]
     floaters = [dict(e) for e in raw_employees if e["role"].upper() == "BACKUP" and e["branch_id"] == "N/A"]
-    
+
     # 1. Calculate initial missing slots for each branch
     for b in status:
         b_staff = [e for e in assigned_staff if e["branch_id"] == b["branch_id"]]
         b_tellers = [e for e in b_staff if e["role"].upper() == "TELLER"]
         b_backups = [e for e in b_staff if e["role"].upper() == "BACKUP"]
-        
+
         b["missing_tellers"] = max(0, 2 - len(b_tellers))
-        
-        # ONLY request a backup floater if the branch is in High Volume
+
+        # Only request a backup floater if the branch is in High Volume
         if b["current_balance"] >= 25000:
             b["missing_backups"] = max(0, 1 - len(b_backups))
         else:
             b["missing_backups"] = 0
-            
+
         b["total_missing"] = b["missing_tellers"] + b["missing_backups"]
 
     # 2. Dynamic Round-Robin Dispatch Engine
     while floaters:
-        # Re-sort every iteration: 
+        # Re-sort every iteration:
         # 1. Most missing frontline tellers
         # 2. Most total missing slots (Tellers + Backups)
         # 3. Highest balance (Tie-breaker)
         status.sort(key=lambda x: (x["missing_tellers"], x["total_missing"], x["current_balance"]), reverse=True)
-        
+
         top_branch = status[0]
         if top_branch["total_missing"] == 0:
-            break # All branches in the network are fully staffed
-            
+            break
+
         floater = floaters.pop(0)
         floater["branch_id"] = top_branch["branch_id"]
-        floater["role"] = "BACKUP TELLER" # UI naming flag
-        
+        floater["role"] = "BACKUP TELLER"
+
         # Fill frontline Tellers before filling the Backup slot
         if top_branch["missing_tellers"] > 0:
-            floater["slot_target"] = "TELLER" # UI routing tag
+            floater["slot_target"] = "TELLER"
             top_branch["missing_tellers"] -= 1
         else:
-            floater["slot_target"] = "BACKUP" # UI routing tag
+            floater["slot_target"] = "BACKUP"
             top_branch["missing_backups"] -= 1
-            
+
         top_branch["total_missing"] -= 1
         assigned_staff.append(floater)
-        
+
     assigned_staff.extend(floaters)
     return assigned_staff
 
@@ -599,11 +597,11 @@ def hire_employee(payload: EmployeeCreate):
 
     # 1. Global Floater Logic
     if payload.role.upper() == "BACKUP":
-        payload.branch_id = "N/A"  # Force global pool
+        payload.branch_id = "N/A"
         backups = [e for e in employees if e["role"].upper() == "BACKUP"]
-        if len(backups) >= 6: # Limit the network to 6 global floaters
+        if len(backups) >= 6:
             raise HTTPException(status_code=400, detail="Maximum global Floater capacity (6) reached.")
-            
+
     # 2. Dedicated Branch Staff Logic
     else:
         branch_employees = [e for e in employees if e["branch_id"] == payload.branch_id]

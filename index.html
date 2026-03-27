@@ -65,6 +65,30 @@
       animation: shimmer 3s linear infinite;
     }
 
+    @keyframes shake {
+
+      0%,
+      100% {
+        transform: translateX(0);
+      }
+
+      20% {
+        transform: translateX(-8px);
+      }
+
+      40% {
+        transform: translateX(8px);
+      }
+
+      60% {
+        transform: translateX(-6px);
+      }
+
+      80% {
+        transform: translateX(6px);
+      }
+    }
+
     @keyframes warningPulse {
 
       0%,
@@ -511,7 +535,6 @@
     const EMPLOYEES_URL = `${BASE_URL}/employees`;
     const EMPLOYEE_URL = `${BASE_URL}/employee`;
     const SCHEDULE_URL = `${BASE_URL}/schedule`;
-    const POLL_INTERVAL = 2000;
     const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
     /* ──────────────────────────────────────────────────────────────
@@ -958,7 +981,6 @@
 
         const branches = data.network_status || [];
         const totalLiquidity = branches.reduce((s, b) => s + b.current_balance, 0);
-        const warningCount = branches.filter(b => b.current_balance < b.minimum_threshold).length;
 
         document.getElementById('stat-branches').textContent = branches.length;
         document.getElementById('stat-liquidity').textContent = formatCurrency(totalLiquidity);
@@ -1050,32 +1072,6 @@
 
   </script>
 
-  <!-- Shake animation for failed login -->
-  <style>
-    @keyframes shake {
-
-      0%,
-      100% {
-        transform: translateX(0);
-      }
-
-      20% {
-        transform: translateX(-8px);
-      }
-
-      40% {
-        transform: translateX(8px);
-      }
-
-      60% {
-        transform: translateX(-6px);
-      }
-
-      80% {
-        transform: translateX(6px);
-      }
-    }
-  </style>
 </body>
 
 </html>
