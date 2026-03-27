@@ -16,7 +16,7 @@ To run this project, you will need the following installed on your machine:
 
 ## Repository Structure
 ```text
-bank_management_system/
+Distributed-Bank-Management-System/
 ├── docker-compose.yml       
 ├── index.html               
 ├── hq_server/
@@ -37,7 +37,7 @@ This project uses Docker Compose to simulate a distributed network on your local
 1.  **Clone the repository:**
     ```bash
     git clone https://github.com/sunnyyy03/Distributed-Bank-Management-System.git
-    cd bank_management_system
+    cd Distributed-Bank-Management-System
     ```
 
 2.  **Build and launch the backend containers:**
