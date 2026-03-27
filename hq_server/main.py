@@ -507,8 +507,7 @@ def trigger_system_reset():
     branch_clocks = {"101": 0, "102": 0}
     
     database.update_branch_cash("101", 10000.0)
-    database.update_branch_cash("102", 10000.0)
-    
+    database.update_branch_cash("102", 10000.0)    
     pub_conn = connect_to_rabbitmq()
     pub_channel = pub_conn.channel()
     msg_payload = json.dumps({
@@ -526,19 +525,95 @@ def trigger_system_reset():
     return {"message": "System reset to $10000.0 per branch"}
 
 
+@app.post("/hr/reset")
+def trigger_hr_reset():
+    """Clear all employees and reset to baseline (Alice and Bob as Managers)."""
+    database.reset_hr_rosters()
+    return {"message": "HR rosters reset to baseline."}
+
+
 # =================================================================
 # Employee CRUD Endpoints
 # =================================================================
 
 @app.get("/employees")
 def list_employees():
-    """Return the list of all current employees."""
-    return database.get_employees()
+    """Return all employees, dynamically deploying floaters via a greedy algorithm."""
+    raw_employees = database.get_employees()
+    status = database.get_all_cash_status()
+    
+    assigned_staff = [dict(e) for e in raw_employees if e["branch_id"] != "N/A"]
+    floaters = [dict(e) for e in raw_employees if e["role"].upper() == "BACKUP" and e["branch_id"] == "N/A"]
+    
+    # 1. Calculate initial missing slots for each branch
+    for b in status:
+        b_staff = [e for e in assigned_staff if e["branch_id"] == b["branch_id"]]
+        b_tellers = [e for e in b_staff if e["role"].upper() == "TELLER"]
+        b_backups = [e for e in b_staff if e["role"].upper() == "BACKUP"]
+        
+        b["missing_tellers"] = max(0, 2 - len(b_tellers))
+        
+        # ONLY request a backup floater if the branch is in High Volume
+        if b["current_balance"] >= 25000:
+            b["missing_backups"] = max(0, 1 - len(b_backups))
+        else:
+            b["missing_backups"] = 0
+            
+        b["total_missing"] = b["missing_tellers"] + b["missing_backups"]
+
+    # 2. Dynamic Round-Robin Dispatch Engine
+    while floaters:
+        # Re-sort every iteration: 
+        # 1. Most missing frontline tellers
+        # 2. Most total missing slots (Tellers + Backups)
+        # 3. Highest balance (Tie-breaker)
+        status.sort(key=lambda x: (x["missing_tellers"], x["total_missing"], x["current_balance"]), reverse=True)
+        
+        top_branch = status[0]
+        if top_branch["total_missing"] == 0:
+            break # All branches in the network are fully staffed
+            
+        floater = floaters.pop(0)
+        floater["branch_id"] = top_branch["branch_id"]
+        floater["role"] = "BACKUP TELLER" # UI naming flag
+        
+        # Fill frontline Tellers before filling the Backup slot
+        if top_branch["missing_tellers"] > 0:
+            floater["slot_target"] = "TELLER" # UI routing tag
+            top_branch["missing_tellers"] -= 1
+        else:
+            floater["slot_target"] = "BACKUP" # UI routing tag
+            top_branch["missing_backups"] -= 1
+            
+        top_branch["total_missing"] -= 1
+        assigned_staff.append(floater)
+        
+    assigned_staff.extend(floaters)
+    return assigned_staff
 
 
 @app.post("/employee")
 def hire_employee(payload: EmployeeCreate):
     """Add a new employee record and return the generated ID."""
+    employees = database.get_employees()
+
+    # 1. Global Floater Logic
+    if payload.role.upper() == "BACKUP":
+        payload.branch_id = "N/A"  # Force global pool
+        backups = [e for e in employees if e["role"].upper() == "BACKUP"]
+        if len(backups) >= 6: # Limit the network to 6 global floaters
+            raise HTTPException(status_code=400, detail="Maximum global Floater capacity (6) reached.")
+            
+    # 2. Dedicated Branch Staff Logic
+    else:
+        branch_employees = [e for e in employees if e["branch_id"] == payload.branch_id]
+        if payload.role.upper() == "MANAGER":
+            raise HTTPException(status_code=400, detail="Branch already has a Manager.")
+        elif payload.role.upper() == "TELLER":
+            tellers = [e for e in branch_employees if e["role"].upper() == "TELLER"]
+            if len(tellers) >= 2:
+                raise HTTPException(status_code=400, detail="Maximum Teller capacity (2) reached.")
+
     try:
         new_id = database.add_employee(
             branch_id=payload.branch_id,
