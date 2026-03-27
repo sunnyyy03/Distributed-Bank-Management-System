@@ -114,14 +114,14 @@ def reset_hr_rosters():
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     cursor.execute("DELETE FROM Employees")
-    
+
     for emp in BASELINE_EMPLOYEES:
         cursor.execute(
             "INSERT INTO Employees (employee_id, branch_id, name, role) "
             "VALUES (?, ?, ?, ?)",
             emp,
         )
-        
+
     conn.commit()
     conn.close()
 
