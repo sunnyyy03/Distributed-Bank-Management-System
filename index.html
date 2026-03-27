@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Bank HQ — Real-Time Dashboard</title>
+  <title>Bank HQ</title>
   <meta name="description"
     content="Real-time monitoring dashboard for the Distributed Bank Management System Headquarters." />
   <script src="https://cdn.tailwindcss.com"></script>
@@ -363,15 +363,21 @@
 
         <!-- HR Control Panel -->
         <section>
-          <div class="flex items-center gap-3 mb-5">
-            <div
-              class="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center shadow-lg shadow-violet-500/20">
-              <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round"
-                  d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87M16 3.13a4 4 0 010 7.75M12 14a4 4 0 100-8 4 4 0 000 8z" />
-              </svg>
+          <div class="flex items-center justify-between mb-5">
+            <div class="flex items-center gap-3">
+              <div
+                class="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center shadow-lg shadow-violet-500/20">
+                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round"
+                    d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87M16 3.13a4 4 0 010 7.75M12 14a4 4 0 100-8 4 4 0 000 8z" />
+                </svg>
+              </div>
+              <h2 class="text-sm font-semibold uppercase tracking-widest text-gray-500">HR Control Panel</h2>
             </div>
-            <h2 class="text-sm font-semibold uppercase tracking-widest text-gray-500">HR Control Panel</h2>
+            <button onclick="executeResetHR()"
+              class="text-xs font-semibold uppercase tracking-wider px-4 py-2 rounded-lg bg-surface-600 hover:bg-surface-500 text-white transition-all border border-white/5 shadow-lg shadow-black/20 hover:shadow-black/40 active:scale-[0.98]">
+              Reset Roster
+            </button>
           </div>
 
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -396,6 +402,7 @@
                     <label for="hire-role" class="block text-xs font-medium text-gray-400 mb-1.5">Role</label>
                     <select id="hire-role" required
                       class="w-full bg-surface-600 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-accent-500/50 focus:border-accent-500 transition appearance-none">
+                      <option value="" disabled selected>-- Select Role --</option>
                       <option value="Teller">Teller</option>
                       <option value="Backup">Backup</option>
                     </select>
@@ -404,8 +411,9 @@
                     <label for="hire-branch" class="block text-xs font-medium text-gray-400 mb-1.5">Branch</label>
                     <select id="hire-branch" required
                       class="w-full bg-surface-600 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-accent-500/50 focus:border-accent-500 transition appearance-none">
-                      <option value="101">101 — HQ Local</option>
-                      <option value="102">102 — Downtown</option>
+                      <option value="" disabled selected>-- Select Branch --</option>
+                      <option value="101">Branch 101</option>
+                      <option value="102">Branch 102</option>
                     </select>
                     <p id="branch-na"
                       class="hidden w-full bg-surface-600 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-gray-500">
@@ -780,84 +788,78 @@
           <div class="bg-surface-700 rounded-2xl border border-white/5 overflow-hidden fade-up">
             <div class="px-6 py-4 border-b border-white/5 flex items-center flex-wrap gap-2">
               <h3 class="text-sm font-bold text-white">${branchLabel}</h3>
-              <span class="text-[10px] font-medium uppercase tracking-wider text-gray-500 px-2 py-0.5 rounded-full bg-surface-600">${info.branch_size}</span>
               ${volBadge}
               <span class="ml-auto text-xs text-gray-500 tabular-nums">${formatCurrency(info.current_balance)}</span>
             </div>
-            <div class="overflow-x-auto">
-              <table class="w-full text-sm">
-                <thead>
-                  <tr class="text-[10px] uppercase tracking-wider text-gray-500 border-b border-white/5">
-                    <th class="text-left py-2.5 pl-6 font-semibold w-24">Day</th>
-                    ${(() => {
-            let maxShifts = 0;
-            for (const day of WEEKDAYS) {
-              const shifts = (info.days && info.days[day]) || [];
-              if (shifts.length > maxShifts) maxShifts = shifts.length;
-            }
-            let ths = '';
-            for (let i = 1; i <= maxShifts; i++) {
-              ths += '<th class="text-left py-2.5 px-3 font-semibold"></th>';
-            }
-            return ths;
-          })()}
-                  </tr>
-                </thead>
-                <tbody>
-                  ${WEEKDAYS.map(day => {
-            const shifts = (info.days && info.days[day]) || [];
-            let maxShifts = 0;
-            for (const d of WEEKDAYS) {
-              const s = (info.days && info.days[d]) || [];
-              if (s.length > maxShifts) maxShifts = s.length;
-            }
+            <div class="p-6 pt-4">
+              ${(() => {
+            const branchId = String(info.branch_id);
+            const branchEmps = Object.values(cachedEmployees).filter(e => String(e.branch_id) === branchId);
+            const managers = branchEmps.filter(e => e.role.toUpperCase() === 'MANAGER');
+            const tellers = branchEmps.filter(e => e.role.toUpperCase() === 'TELLER' || e.slot_target === 'TELLER');
+            const backups = branchEmps.filter(e => e.role.toUpperCase() === 'BACKUP' || e.slot_target === 'BACKUP');
 
-            let cells = '';
-            for (let i = 0; i < maxShifts; i++) {
-              if (i < shifts.length) {
-                const s = shifts[i];
-                const isUnassigned = s.assigned_to && (s.assigned_to.includes('UNASSIGNED') || s.assigned_to.includes('NEED BACKUP'));
-                const empRecord = s.employee_id ? cachedEmployees[s.employee_id] : null;
-                const isBackupEmployee = s.role === 'Backup' || (empRecord && empRecord.role === 'Backup');
-
-                let cellBg = '';
-                let textCol = 'text-gray-300';
-                let roleCol = 'text-gray-500';
-                let displayName = s.assigned_to;
-                let displayRole = s.role;
-
-                if (isUnassigned) {
-                  cellBg = 'bg-red-500/10 border border-red-400/20 rounded-lg';
-                  textCol = 'text-red-300';
-                  roleCol = 'text-red-400';
-                  displayName = 'UNASSIGNED';
-                } else if (isBackupEmployee) {
-                  cellBg = 'bg-sky-500/10 border border-sky-400/20 rounded-lg';
-                  textCol = 'text-sky-200';
-                  roleCol = 'text-sky-400';
-                  displayRole = 'BACKUP';
-                }
-
-                cells += `
-                          <td class="py-2.5 px-3">
-                            <div class="px-2.5 py-1.5 ${cellBg}">
-                              <p class="font-medium ${textCol} text-xs">${displayName}</p>
-                              <p class="${roleCol} text-[10px] uppercase tracking-wider font-semibold">${displayRole}</p>
-                            </div>
-                          </td>`;
-              } else {
-                cells += '<td class="py-2.5 px-3"></td>';
-              }
-            }
+            const currentBalance = info.current_balance || 0;
+            const showBackupCol = currentBalance >= 25000 || backups.length > 0;
 
             return `
-                      <tr class="row-hover border-b border-white/[.03]">
-                        <td class="py-2.5 pl-6 font-semibold text-white text-xs">${day.slice(0, 3)}</td>
-                        ${cells}
-                      </tr>`;
-          }).join('')}
-                </tbody>
-              </table>
+                  <!-- Header Row -->
+                  <div class="grid gap-4 px-3 pb-2 text-[10px] uppercase tracking-wider text-gray-500 border-b border-white/5" style="grid-template-columns: 60px repeat(${showBackupCol ? 4 : 3}, minmax(0, 1fr));">
+                    <div class="pl-2 font-semibold">Day</div>
+                    <div class="font-semibold">Manager</div>
+                    <div class="font-semibold">Teller 1</div>
+                    <div class="font-semibold">Teller 2</div>
+                    ${showBackupCol ? '<div class="font-semibold">Backup</div>' : ''}
+                  </div>
+                  
+                  <!-- Daily Rows -->
+                  <div class="flex flex-col mt-2 space-y-1.5">
+                    ${WEEKDAYS.map(day => {
+              const s1 = { name: managers[0]?.name || 'UNASSIGNED', role: 'MANAGER', missing: !managers[0] };
+              const s2 = { name: tellers[0]?.name || 'UNASSIGNED TELLER', role: tellers[0]?.role?.toUpperCase() || 'TELLER', missing: !tellers[0] };
+              const s3 = { name: tellers[1]?.name || 'UNASSIGNED TELLER', role: tellers[1]?.role?.toUpperCase() || 'TELLER', missing: !tellers[1] };
+              const s4 = { name: backups[0]?.name || 'UNASSIGNED BACKUP', role: backups[0]?.role?.toUpperCase() || 'BACKUP', missing: !backups[0] };
+
+              const renderSlot = (slot) => {
+                if (slot.hideMissing) {
+                  return `<div class="border border-dashed border-white/5 rounded-lg opacity-20 min-h-[44px]"></div>`;
+                }
+
+                let cellBg = 'bg-surface-600/50 border border-white/5';
+                let textCol = 'text-gray-300';
+                let roleCol = 'text-gray-500';
+
+                if (slot.missing) {
+                  cellBg = 'bg-red-500/10 border border-red-400/20';
+                  textCol = 'text-red-300';
+                  roleCol = 'text-red-400';
+                } else if (slot.role === 'BACKUP' || slot.role === 'BACKUP TELLER') {
+                  cellBg = 'bg-sky-500/10 border border-sky-400/20';
+                  textCol = 'text-sky-200';
+                  roleCol = 'text-sky-400';
+                }
+
+                return `
+                          <div class="px-2.5 py-1.5 ${cellBg} rounded-lg flex flex-col justify-center min-w-0 shadow-sm shadow-black/10">
+                            <p class="font-medium ${textCol} text-xs truncate" title="${slot.name}">${slot.name}</p>
+                            <p class="${roleCol} text-[9px] uppercase tracking-wider font-semibold mt-0.5">${slot.role}</p>
+                          </div>
+                        `;
+              };
+
+              return `
+                        <div class="grid gap-4 items-center p-2 rounded-xl row-hover border border-white/[.02] bg-surface-800/30 transition-colors" style="grid-template-columns: 60px repeat(${showBackupCol ? 4 : 3}, minmax(0, 1fr));">
+                          <div class="font-semibold text-white text-xs pl-2">${day.slice(0, 3)}</div>
+                          ${renderSlot(s1)}
+                          ${renderSlot(s2)}
+                          ${renderSlot(s3)}
+                          ${showBackupCol ? renderSlot(s4) : ''}
+                        </div>
+                      `;
+            }).join('')}
+                  </div>
+                `;
+          })()}
             </div>
           </div>`;
       }
@@ -918,7 +920,13 @@
 
         feedback.textContent = `✓ ${data.message}`;
         feedback.className = 'text-xs text-center h-4 text-emerald-400';
+
+        // 1. Reset the underlying form values
         document.getElementById('hire-form').reset();
+
+        // 2. Manually trigger the 'change' event to force the UI to update its visual state
+        const roleInput = document.getElementById('hire-role');
+        roleInput.dispatchEvent(new Event('change'));
 
         await Promise.all([fetchEmployees(), fetchSchedule()]);
       } catch (err) {
@@ -998,6 +1006,10 @@
 
     window.executeReset = async function () {
       await executeAction(`${BASE_URL}/reset`, {});
+    };
+
+    window.executeResetHR = async function () {
+      await executeAction(`${BASE_URL}/hr/reset`, {});
     };
 
     async function executeAction(url, payload) {
