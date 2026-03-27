@@ -11,7 +11,6 @@ dedicated coordinator queue for PREPARE / COMMIT / ABORT messages.
 
 import json
 import os
-import random
 import threading
 import time
 
@@ -81,6 +80,7 @@ def _send_branch_update():
         connection.close()
     except Exception as e:
         print(f"Failed to send branch update: {e}")
+
 
 def _on_coordinator_message(ch, method, properties, body):
     """Handle PREPARE, COMMIT, and ABORT messages from the HQ Coordinator."""
