@@ -1010,7 +1010,6 @@
 
     window.executeResetHR = async function () {
       await executeAction(`${BASE_URL}/hr/reset`, {});
-      pollAll();
     };
 
     async function executeAction(url, payload) {
