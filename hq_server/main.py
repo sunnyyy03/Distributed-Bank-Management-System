@@ -563,8 +563,11 @@ def list_employees():
 
     # 2. Dynamic Round-Robin Dispatch Engine
     while floaters:
-        # Re-sort every iteration: most missing slots first, then highest balance
-        status.sort(key=lambda x: (x["total_missing"], x["current_balance"]), reverse=True)
+        # Re-sort every iteration: 
+        # 1. Most missing frontline tellers
+        # 2. Most total missing slots (Tellers + Backups)
+        # 3. Highest balance (Tie-breaker)
+        status.sort(key=lambda x: (x["missing_tellers"], x["total_missing"], x["current_balance"]), reverse=True)
         
         top_branch = status[0]
         if top_branch["total_missing"] == 0:
