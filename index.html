@@ -793,8 +793,8 @@
             </div>
             <div class="p-6 pt-4">
               ${(() => {
-            const branchId = branchLabel.split(' ')[1] || '101';
-            const branchEmps = Object.values(cachedEmployees).filter(e => e.branch_id === branchId);
+            const branchId = String(info.branch_id);
+            const branchEmps = Object.values(cachedEmployees).filter(e => String(e.branch_id) === branchId);
             const managers = branchEmps.filter(e => e.role.toUpperCase() === 'MANAGER');
             const tellers = branchEmps.filter(e => e.role.toUpperCase() === 'TELLER' || e.slot_target === 'TELLER');
             const backups = branchEmps.filter(e => e.role.toUpperCase() === 'BACKUP' || e.slot_target === 'BACKUP');
@@ -921,12 +921,12 @@
         feedback.textContent = `✓ ${data.message}`;
         feedback.className = 'text-xs text-center h-4 text-emerald-400';
 
-        // 1. Let the browser reset the form values back to the 'selected' default options
+        // 1. Reset the underlying form values
         document.getElementById('hire-form').reset();
 
-        // 2. Manually unlock the Branch dropdown in case the 'Backup' role disabled it
-        const branchInput = document.getElementById('hire-branch');
-        branchInput.disabled = false;
+        // 2. Manually trigger the 'change' event to force the UI to update its visual state
+        const roleInput = document.getElementById('hire-role');
+        roleInput.dispatchEvent(new Event('change'));
 
         await Promise.all([fetchEmployees(), fetchSchedule()]);
       } catch (err) {

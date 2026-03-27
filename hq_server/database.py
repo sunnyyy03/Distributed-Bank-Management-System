@@ -11,6 +11,13 @@ import uuid
 
 DB_FILE = "bank_data.db"
 
+# Single source of truth for the baseline employee roster.
+# Constraint: 1 Manager per branch, seeded on first boot and on HR reset.
+BASELINE_EMPLOYEES = [
+    ("E1001", "101", "Alice", "Manager"),
+    ("E2001", "102", "Bob",   "Manager"),
+]
+
 
 def init_db():
     """Initialize the database and create the required tables.
@@ -75,13 +82,7 @@ def init_db():
     # ------------------------------------------------------------------
     # Seed Employees
     # ------------------------------------------------------------------
-    # Baseline constraints: 1 Manager per branch
-    baseline_employees = [
-        ("E1001", "101", "Alice", "Manager"),
-        ("E2001", "102", "Bob",   "Manager"),
-    ]
-
-    for emp in baseline_employees:
+    for emp in BASELINE_EMPLOYEES:
         cursor.execute(
             "INSERT OR IGNORE INTO Employees (employee_id, branch_id, name, role) "
             "VALUES (?, ?, ?, ?)",
@@ -114,12 +115,7 @@ def reset_hr_rosters():
     cursor = conn.cursor()
     cursor.execute("DELETE FROM Employees")
     
-    baseline_employees = [
-        ("E1001", "101", "Alice", "Manager"),
-        ("E2001", "102", "Bob",   "Manager"),
-    ]
-
-    for emp in baseline_employees:
+    for emp in BASELINE_EMPLOYEES:
         cursor.execute(
             "INSERT INTO Employees (employee_id, branch_id, name, role) "
             "VALUES (?, ?, ?, ?)",
