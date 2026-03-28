@@ -56,10 +56,13 @@ To confirm the Headquarters is successfully receiving, aggregating, and routing 
     Username: `Admin`
     Password: `Admin`
 
-1.  **Monitor the State:** Open `index.html` and watch the live logs. You will see branches pinging the HQ with automated transactions and Lamport timestamps.
-2.  **Trigger High Volume:** Use the Control Panel to make a large deposit into Branch 101, pushing its balance over $25,000. Notice the UI dynamically flag the branch as `HIGH VOLUME` and open a 5th employee slot.
-3.  **Test the Routing Algorithm:** Use the "Hire Staff" form to hire a "Backup" employee. Because Branch 101 crossed the volume threshold, the Greedy Algorithm will instantly intercept the new hire and dispatch them to Branch 101 to handle the load.
-4.  **Test the Tie-Breaker:** Push Branch 102 over the threshold as well, but give it a higher balance than Branch 101. Hire another Backup and watch the algorithm prioritize Branch 102 based on the financial tie-breaker logic.
+1.  **Network Initialization & Baseline:** Open `index.html` and log in. Navigate to the **Network & Liquidity** tab. Note the baseline state: all branches are stable, and the Lamport Clocks for each branch are synchronized at their starting integers.
+2.  **Liquidity Warning Simulation:** Click the **Manage ▾** dropdown on Branch 101 and click **Withdraw $10,000**. The UI will instantly react, turning the branch card red with a `Liquidity Warning` badge to indicate the branch has dropped below its minimum operating threshold.
+3.  **Distributed Wire Transfer (Clock Sync):** To bail out Branch 101, open the dropdown for Branch 102 and click **Transfer $10,000**. Watch the Lamport Clocks for *both* branches increment simultaneously, proving that the centralized HQ is correctly ordering the distributed cross-node event. Branch 101 will now recover its stable state.
+4.  **Traffic Spike (High Volume):** We need to simulate a surge at Branch 102. Click **Deposit $10,000** on Branch 102 three times to push its balance to $30,000 (crossing the $25,000 threshold). The UI will dynamically flag the branch with a `HIGH VOLUME` badge, signaling that this node requires scaling.
+5.  **Auto-Scaling Dispatch (Greedy Algorithm):** Switch to the **Workforce & HR** tab. Use the "Hire Staff" form to hire a new "Backup" employee. Because Branch 102 is experiencing a traffic spike, the Greedy Dispatch Engine will instantly intercept the new hire and safely route them to Branch 102's Live Weekly Schedule.
+6.  **The Algorithmic Tie-Breaker:** Go back to the Network tab. Click **Deposit $10,000** on Branch 101 until its balance hits $40,000. Now *both* branches are over the High Volume threshold, but Branch 101 has the higher severity. Return to the HR tab and hire one more Backup. Watch the algorithm perfectly resolve the tie by routing the backup to Branch 101.
+7.  **System Recovery (Database Reset):** To conclude the demo, click the **Reset Network** and **Reset Roster** buttons. The FastAPI backend will safely drop the SQLite tables, re-seed the baseline configurations, and broadcast the reset to the network, snapping the dashboard perfectly back to Step 1.
 
 ## Teardown
 To shut down the network and remove the containers, run:
