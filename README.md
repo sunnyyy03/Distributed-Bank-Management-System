@@ -52,6 +52,10 @@ This project uses Docker Compose to simulate a distributed network on your local
 ## How to Test and Verify (Demo Protocol)
 To confirm the Headquarters is successfully receiving, aggregating, and routing data across the distributed branches:
 
+**Login Credentials** | 
+    Username: `Admin`
+    Password: `Admin`
+
 1.  **Monitor the State:** Open `index.html` and watch the live logs. You will see branches pinging the HQ with automated transactions and Lamport timestamps.
 2.  **Trigger High Volume:** Use the Control Panel to make a large deposit into Branch 101, pushing its balance over $25,000. Notice the UI dynamically flag the branch as `HIGH VOLUME` and open a 5th employee slot.
 3.  **Test the Routing Algorithm:** Use the "Hire Staff" form to hire a "Backup" employee. Because Branch 101 crossed the volume threshold, the Greedy Algorithm will instantly intercept the new hire and dispatch them to Branch 101 to handle the load.
